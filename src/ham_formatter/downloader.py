@@ -1,6 +1,6 @@
 """Download repeater data from RepeaterBook.com."""
 
-from typing import Optional
+from typing import Dict, Optional, Any
 
 import pandas as pd
 import requests
@@ -21,7 +21,7 @@ class RepeaterBookDownloader:
         self.timeout = timeout
         self.session = requests.Session()
         self.session.headers.update(
-            {"User-Agent": "ham-formatter/0.1.0 (Amateur Radio Tool)"}
+            {"User-Agent": "ham-formatter/0.2.0 (Amateur Radio Tool)"}
         )
 
     def download_by_state(
@@ -40,20 +40,100 @@ class RepeaterBookDownloader:
             requests.RequestException: If download fails
             ValueError: If no data is found or parsing fails
         """
+        return self._download("state", state=state, country=country)
+
+    def download_by_county(
+        self, state: str, county: str, country: str = "United States"
+    ) -> pd.DataFrame:
+        """Download all repeaters for a specific county.
+
+        Args:
+            state: State/province code (e.g., 'CA', 'TX')
+            county: County name (e.g., 'Los Angeles', 'Harris')
+            country: Country name (default: 'United States')
+
+        Returns:
+            DataFrame containing repeater information
+
+        Raises:
+            requests.RequestException: If download fails
+            ValueError: If no data is found or parsing fails
+        """
+        return self._download("county", state=state, county=county, country=country)
+
+    def download_by_city(
+        self, state: str, city: str, country: str = "United States"
+    ) -> pd.DataFrame:
+        """Download all repeaters for a specific city.
+
+        Args:
+            state: State/province code (e.g., 'CA', 'TX')
+            city: City name (e.g., 'Los Angeles', 'Austin')
+            country: Country name (default: 'United States')
+
+        Returns:
+            DataFrame containing repeater information
+
+        Raises:
+            requests.RequestException: If download fails
+            ValueError: If no data is found or parsing fails
+        """
+        return self._download("city", state=state, city=city, country=country)
+
+    def _download(self, level: str, **kwargs) -> pd.DataFrame:
+        """Download repeater data at specified level.
+
+        Args:
+            level: Download level ('state', 'county', or 'city')
+            **kwargs: Parameters for the specific level
+
+        Returns:
+            DataFrame containing repeater information
+        """
+        params = self._build_params(level, **kwargs)
+
         # First, try to get CSV export if available
-        csv_data = self._try_csv_export(state, country)
+        csv_data = self._try_csv_export(params)
         if csv_data is not None:
             return csv_data
 
         # Fall back to HTML scraping
-        return self._scrape_html_table(state, country)
+        return self._scrape_html_table(params)
 
-    def _try_csv_export(self, state: str, country: str) -> Optional[pd.DataFrame]:
+    def _build_params(self, level: str, **kwargs) -> Dict[str, Any]:
+        """Build query parameters for the specified level.
+
+        Args:
+            level: Download level ('state', 'county', or 'city')
+            **kwargs: Parameters for the specific level
+
+        Returns:
+            Dictionary of query parameters
+        """
+        # Base parameters for all levels
+        params = {
+            "state_id": kwargs.get("state", ""),
+            "loc": kwargs.get("country", "United States"),
+            "band": "All",
+            "freq": "",
+            "band6": "",
+            "use": "All",
+            "sort": "Distance",
+        }
+
+        # Add level-specific parameters
+        if level == "county":
+            params["county"] = kwargs.get("county", "")
+        elif level == "city":
+            params["city"] = kwargs.get("city", "")
+
+        return params
+
+    def _try_csv_export(self, params: Dict[str, Any]) -> Optional[pd.DataFrame]:
         """Attempt to download CSV export if available.
 
         Args:
-            state: State/province code
-            country: Country name
+            params: Query parameters dictionary
 
         Returns:
             DataFrame if CSV export is available, None otherwise
@@ -61,10 +141,23 @@ class RepeaterBookDownloader:
         # RepeaterBook.com CSV export URL pattern (this may need adjustment)
         csv_url = f"{self.BASE_URL}/repeaters/downloads/index.php"
 
-        params = {"state_id": state, "country": country, "format": "csv"}
+        # Build CSV export params from search params
+        csv_params = {
+            "state_id": params.get("state_id", ""),
+            "country": params.get("loc", "United States"),
+            "format": "csv",
+        }
+
+        # Add county/city params if present
+        if "county" in params:
+            csv_params["county"] = params["county"]
+        if "city" in params:
+            csv_params["city"] = params["city"]
 
         try:
-            response = self.session.get(csv_url, params=params, timeout=self.timeout)
+            response = self.session.get(
+                csv_url, params=csv_params, timeout=self.timeout
+            )
 
             if response.status_code == 200 and "text/csv" in response.headers.get(
                 "content-type", ""
@@ -80,12 +173,11 @@ class RepeaterBookDownloader:
 
         return None
 
-    def _scrape_html_table(self, state: str, country: str) -> pd.DataFrame:
+    def _scrape_html_table(self, params: Dict[str, Any]) -> pd.DataFrame:
         """Scrape repeater data from HTML table.
 
         Args:
-            state: State/province code
-            country: Country name
+            params: Query parameters dictionary
 
         Returns:
             DataFrame containing scraped repeater data
@@ -96,16 +188,6 @@ class RepeaterBookDownloader:
         """
         # RepeaterBook.com search URL (this URL structure may need verification)
         search_url = f"{self.BASE_URL}/repeaters/index.php"
-
-        params = {
-            "state_id": state,
-            "loc": country,
-            "band": "All",
-            "freq": "",
-            "band6": "",
-            "use": "All",
-            "sort": "Distance",
-        }
 
         try:
             response = self.session.get(search_url, params=params, timeout=self.timeout)
@@ -132,12 +214,21 @@ class RepeaterBookDownloader:
                     table = max(tables, key=lambda t: len(t.find_all("tr")))
 
         if not table:
-            raise ValueError(f"No repeater table found for {state}, {country}")
+            # Build error message from params
+            location_desc = params.get("state_id", "unknown")
+            if "county" in params:
+                location_desc = f"{params['county']} County, {location_desc}"
+            elif "city" in params:
+                location_desc = f"{params['city']}, {location_desc}"
+            location_desc += f", {params.get('loc', 'Unknown Country')}"
+            raise ValueError(f"No repeater table found for {location_desc}")
 
         # Convert HTML table to DataFrame
         try:
             # Use pandas read_html for easier table parsing
-            dfs = pd.read_html(str(table))
+            from io import StringIO
+
+            dfs = pd.read_html(StringIO(str(table)))
             if not dfs:
                 raise ValueError("No data found in HTML table")
 
@@ -163,11 +254,12 @@ class RepeaterBookDownloader:
         # Remove any completely empty rows
         df = df.dropna(how="all")
 
-        # Strip whitespace from all string columns
+        # Strip whitespace from all string columns and replace empty strings with NaN
         string_columns = df.select_dtypes(include=["object"]).columns
-        df[string_columns] = df[string_columns].apply(
-            lambda x: x.str.strip() if hasattr(x, "str") else x
-        )
+        for col in string_columns:
+            if hasattr(df[col], "str"):
+                df[col] = df[col].str.strip()
+                df[col] = df[col].replace("", pd.NA)
 
         # Try to standardize common column names
         column_mapping = {
@@ -214,3 +306,53 @@ def download_repeater_data(
     """
     downloader = RepeaterBookDownloader(timeout=timeout)
     return downloader.download_by_state(state, country)
+
+
+def download_repeater_data_by_county(
+    state: str, county: str, country: str = "United States", timeout: int = 30
+) -> pd.DataFrame:
+    """Download repeater data for a specific county from RepeaterBook.com.
+
+    This is a convenience function that creates a RepeaterBookDownloader
+    and downloads data for the specified county.
+
+    Args:
+        state: State/province code (e.g., 'CA', 'TX')
+        county: County name (e.g., 'Los Angeles', 'Harris')
+        country: Country name (default: 'United States')
+        timeout: Request timeout in seconds
+
+    Returns:
+        DataFrame containing repeater information
+
+    Raises:
+        requests.RequestException: If download fails
+        ValueError: If no data is found or parsing fails
+    """
+    downloader = RepeaterBookDownloader(timeout=timeout)
+    return downloader.download_by_county(state, county, country)
+
+
+def download_repeater_data_by_city(
+    state: str, city: str, country: str = "United States", timeout: int = 30
+) -> pd.DataFrame:
+    """Download repeater data for a specific city from RepeaterBook.com.
+
+    This is a convenience function that creates a RepeaterBookDownloader
+    and downloads data for the specified city.
+
+    Args:
+        state: State/province code (e.g., 'CA', 'TX')
+        city: City name (e.g., 'Los Angeles', 'Austin')
+        country: Country name (default: 'United States')
+        timeout: Request timeout in seconds
+
+    Returns:
+        DataFrame containing repeater information
+
+    Raises:
+        requests.RequestException: If download fails
+        ValueError: If no data is found or parsing fails
+    """
+    downloader = RepeaterBookDownloader(timeout=timeout)
+    return downloader.download_by_city(state, city, country)

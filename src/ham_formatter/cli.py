@@ -8,7 +8,11 @@ import click
 
 from ham_formatter import __version__
 from ham_formatter.csv_utils import read_csv, write_csv
-from ham_formatter.downloader import download_repeater_data
+from ham_formatter.downloader import (
+    download_repeater_data,
+    download_repeater_data_by_county,
+    download_repeater_data_by_city,
+)
 from ham_formatter.radios import get_supported_radios, get_radio_formatter
 
 
@@ -28,8 +32,15 @@ def main(ctx: click.Context) -> None:
 @click.option(
     "--state",
     "-s",
-    required=True,
-    help="State/province code to download repeaters for (e.g., 'CA', 'TX')",
+    help="State/province code (e.g., 'CA', 'TX') - required for all searches",
+)
+@click.option(
+    "--county",
+    help="County name to filter by (e.g., 'Los Angeles', 'Harris')",
+)
+@click.option(
+    "--city",
+    help="City name to filter by (e.g., 'Los Angeles', 'Austin')",
 )
 @click.option(
     "--country",
@@ -41,23 +52,96 @@ def main(ctx: click.Context) -> None:
     "--output",
     "-o",
     type=click.Path(path_type=Path),
-    help="Output file path (default: repeaters_<state>.csv)",
+    help="Output file path (default: auto-generated based on search criteria)",
 )
 @click.option("--verbose", "-v", is_flag=True, help="Enable verbose output")
-def download(state: str, country: str, output: Optional[Path], verbose: bool) -> None:
-    """Download repeater data from RepeaterBook.com."""
-    if verbose:
-        click.echo(f"Downloading repeater data for {state}, {country}...")
+def download(
+    state: Optional[str],
+    county: Optional[str],
+    city: Optional[str],
+    country: str,
+    output: Optional[Path],
+    verbose: bool,
+) -> None:
+    """Download repeater data from RepeaterBook.com.
+
+    You can download repeaters by:
+    - State only: --state CA
+    - County within state: --state CA --county "Los Angeles"
+    - City within state: --state TX --city Austin
+
+    Note: --state is required for all searches.
+    """
+    # Validate search criteria
+    search_options = [bool(county), bool(city)]
+    num_search_options = sum(search_options)
+
+    if num_search_options > 1:
+        click.echo("Error: Cannot specify both --county and --city", err=True)
+        sys.exit(1)
+
+    if not state:
+        click.echo("Error: --state is required for all searches", err=True)
+        sys.exit(1)
+
+    if (county or city) and not state:
+        click.echo("Error: --state is required when using --county or --city", err=True)
+        sys.exit(1)
+
+    # Determine search type and parameters
+    if county:
+        search_type = "county"
+        if verbose:
+            click.echo(
+                f"Downloading repeater data for {county} County, {state}, {country}..."
+            )
+    elif city:
+        search_type = "city"
+        if verbose:
+            click.echo(f"Downloading repeater data for {city}, {state}, {country}...")
+    else:
+        search_type = "state"
+        if verbose:
+            click.echo(f"Downloading repeater data for {state}, {country}...")
 
     try:
-        data = download_repeater_data(state=state, country=country)
+        # Call appropriate download function
+        if search_type == "county":
+            data = download_repeater_data_by_county(
+                state=state, county=county, country=country
+            )
+        elif search_type == "city":
+            data = download_repeater_data_by_city(
+                state=state, city=city, country=country
+            )
+        else:
+            data = download_repeater_data(state=state, country=country)
 
+        # Generate output filename if not provided
         if output is None:
-            output = Path(f"repeaters_{state.lower()}.csv")
+            state_lower = state.lower()
+            if search_type == "county":
+                county_safe = county.replace(" ", "_").lower()
+                output = Path(f"repeaters_{state_lower}_{county_safe}.csv")
+            elif search_type == "city":
+                city_safe = city.replace(" ", "_").lower()
+                output = Path(f"repeaters_{state_lower}_{city_safe}.csv")
+            else:
+                output = Path(f"repeaters_{state_lower}.csv")
 
         write_csv(data, output)
 
-        click.echo(f"Successfully downloaded {len(data)} repeaters to {output}")
+        # Success message
+        if search_type == "county":
+            location = f"{county} County, {state}"
+        elif search_type == "city":
+            location = f"{city}, {state}"
+        else:
+            location = state
+
+        click.echo(
+            f"Successfully downloaded {len(data)} repeaters from {location} to {output}"
+        )
 
     except Exception as e:
         click.echo(f"Error: {e}", err=True)

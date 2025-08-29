@@ -1,0 +1,251 @@
+"""Tests for the downloader module's new county and city functionality."""
+
+from pathlib import Path
+from unittest.mock import Mock, patch
+
+import pandas as pd
+import pytest
+import responses
+
+from ham_formatter.downloader import (
+    RepeaterBookDownloader,
+    download_repeater_data,
+    download_repeater_data_by_county,
+    download_repeater_data_by_city,
+)
+
+
+class TestRepeaterBookDownloader:
+    """Test the RepeaterBookDownloader class."""
+
+    def test_init(self):
+        """Test downloader initialization."""
+        downloader = RepeaterBookDownloader(timeout=60)
+        assert downloader.timeout == 60
+        assert downloader.BASE_URL == "https://www.repeaterbook.com"
+        assert (
+            downloader.session.headers["User-Agent"]
+            == "ham-formatter/0.2.0 (Amateur Radio Tool)"
+        )
+
+    def test_build_params_state(self):
+        """Test parameter building for state-level search."""
+        downloader = RepeaterBookDownloader()
+        params = downloader._build_params("state", state="CA", country="United States")
+
+        expected = {
+            "state_id": "CA",
+            "loc": "United States",
+            "band": "All",
+            "freq": "",
+            "band6": "",
+            "use": "All",
+            "sort": "Distance",
+        }
+        assert params == expected
+
+    def test_build_params_county(self):
+        """Test parameter building for county-level search."""
+        downloader = RepeaterBookDownloader()
+        params = downloader._build_params(
+            "county", state="CA", county="Los Angeles", country="United States"
+        )
+
+        expected = {
+            "state_id": "CA",
+            "loc": "United States",
+            "band": "All",
+            "freq": "",
+            "band6": "",
+            "use": "All",
+            "sort": "Distance",
+            "county": "Los Angeles",
+        }
+        assert params == expected
+
+    def test_build_params_city(self):
+        """Test parameter building for city-level search."""
+        downloader = RepeaterBookDownloader()
+        params = downloader._build_params(
+            "city", state="TX", city="Austin", country="United States"
+        )
+
+        expected = {
+            "state_id": "TX",
+            "loc": "United States",
+            "band": "All",
+            "freq": "",
+            "band6": "",
+            "use": "All",
+            "sort": "Distance",
+            "city": "Austin",
+        }
+        assert params == expected
+
+    @responses.activate
+    def test_download_by_county_success(self):
+        """Test successful county-level download."""
+        # Load fixture
+        fixture_path = Path(__file__).parent / "fixtures" / "county_search_sample.html"
+        with open(fixture_path) as f:
+            html_content = f.read()
+
+        # Mock the HTTP response
+        responses.add(
+            responses.GET,
+            "https://www.repeaterbook.com/repeaters/downloads/index.php",
+            status=404,  # Force fallback to HTML scraping
+        )
+        responses.add(
+            responses.GET,
+            "https://www.repeaterbook.com/repeaters/index.php",
+            body=html_content,
+            status=200,
+        )
+
+        downloader = RepeaterBookDownloader()
+        df = downloader.download_by_county("CA", "Los Angeles")
+
+        # Verify results
+        assert isinstance(df, pd.DataFrame)
+        assert len(df) == 2
+        assert "frequency" in df.columns
+        assert df.iloc[0]["frequency"] == 146.52
+        assert df.iloc[0]["callsign"] == "W6ABC"
+        assert df.iloc[1]["frequency"] == 147.0
+        assert df.iloc[1]["callsign"] == "K6XYZ"
+
+    @responses.activate
+    def test_download_by_city_success(self):
+        """Test successful city-level download."""
+        # Load fixture
+        fixture_path = Path(__file__).parent / "fixtures" / "city_search_sample.html"
+        with open(fixture_path) as f:
+            html_content = f.read()
+
+        # Mock the HTTP response
+        responses.add(
+            responses.GET,
+            "https://www.repeaterbook.com/repeaters/downloads/index.php",
+            status=404,  # Force fallback to HTML scraping
+        )
+        responses.add(
+            responses.GET,
+            "https://www.repeaterbook.com/repeaters/index.php",
+            body=html_content,
+            status=200,
+        )
+
+        downloader = RepeaterBookDownloader()
+        df = downloader.download_by_city("TX", "Austin")
+
+        # Verify results
+        assert isinstance(df, pd.DataFrame)
+        assert len(df) == 1
+        assert "frequency" in df.columns
+        assert df.iloc[0]["frequency"] == 444.125
+        assert df.iloc[0]["callsign"] == "N5DEF"
+
+    @responses.activate
+    def test_download_by_county_no_table_found(self):
+        """Test error when no table is found for county search."""
+        responses.add(
+            responses.GET,
+            "https://www.repeaterbook.com/repeaters/downloads/index.php",
+            status=404,  # Force fallback to HTML scraping
+        )
+        responses.add(
+            responses.GET,
+            "https://www.repeaterbook.com/repeaters/index.php",
+            body="<html><body><p>No repeaters found</p></body></html>",
+            status=200,
+        )
+
+        downloader = RepeaterBookDownloader()
+        with pytest.raises(
+            ValueError, match="No repeater table found for Los Angeles County, CA"
+        ):
+            downloader.download_by_county("CA", "Los Angeles")
+
+    def test_clean_scraped_data(self):
+        """Test data cleaning functionality."""
+        downloader = RepeaterBookDownloader()
+
+        # Create test DataFrame with issues to clean
+        df = pd.DataFrame(
+            {
+                "Frequency": ["  146.520  ", "147.000"],
+                "Call Sign": ["W6ABC", "  K6XYZ  "],
+                "Tone": ["", "123.0"],
+                "Location": ["Test  ", ""],
+            }
+        )
+
+        cleaned = downloader._clean_scraped_data(df)
+
+        # Check that columns are renamed
+        assert "frequency" in cleaned.columns
+        assert "callsign" in cleaned.columns
+
+        # Check whitespace stripping
+        assert cleaned["frequency"].iloc[0] == "146.520"
+        assert cleaned["callsign"].iloc[1] == "K6XYZ"
+
+        # Check empty string handling
+        assert pd.isna(cleaned["tone"].iloc[0])
+        assert pd.isna(cleaned["location"].iloc[1])
+
+
+class TestConvenienceFunctions:
+    """Test top-level convenience functions."""
+
+    @patch("ham_formatter.downloader.RepeaterBookDownloader")
+    def test_download_repeater_data_by_county(self, mock_downloader_class):
+        """Test county download convenience function."""
+        mock_downloader = Mock()
+        mock_downloader.download_by_county.return_value = pd.DataFrame(
+            {"test": [1, 2, 3]}
+        )
+        mock_downloader_class.return_value = mock_downloader
+
+        result = download_repeater_data_by_county(
+            "CA", "Los Angeles", "United States", 30
+        )
+
+        mock_downloader_class.assert_called_once_with(timeout=30)
+        mock_downloader.download_by_county.assert_called_once_with(
+            "CA", "Los Angeles", "United States"
+        )
+        assert isinstance(result, pd.DataFrame)
+
+    @patch("ham_formatter.downloader.RepeaterBookDownloader")
+    def test_download_repeater_data_by_city(self, mock_downloader_class):
+        """Test city download convenience function."""
+        mock_downloader = Mock()
+        mock_downloader.download_by_city.return_value = pd.DataFrame(
+            {"test": [1, 2, 3]}
+        )
+        mock_downloader_class.return_value = mock_downloader
+
+        result = download_repeater_data_by_city("TX", "Austin", "United States", 30)
+
+        mock_downloader_class.assert_called_once_with(timeout=30)
+        mock_downloader.download_by_city.assert_called_once_with(
+            "TX", "Austin", "United States"
+        )
+        assert isinstance(result, pd.DataFrame)
+
+    @patch("ham_formatter.downloader.RepeaterBookDownloader")
+    def test_original_download_function_still_works(self, mock_downloader_class):
+        """Test that original download function is unchanged."""
+        mock_downloader = Mock()
+        mock_downloader.download_by_state.return_value = pd.DataFrame(
+            {"test": [1, 2, 3]}
+        )
+        mock_downloader_class.return_value = mock_downloader
+
+        result = download_repeater_data("CA", "United States", 30)
+
+        mock_downloader_class.assert_called_once_with(timeout=30)
+        mock_downloader.download_by_state.assert_called_once_with("CA", "United States")
+        assert isinstance(result, pd.DataFrame)

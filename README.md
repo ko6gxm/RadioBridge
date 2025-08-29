@@ -31,6 +31,14 @@ Ham Formatter is a Python tool that downloads repeater information from Repeater
 - Python 3.9 or higher
 - pipenv (for development)
 
+### Version 0.2.0 Updates
+
+**New in version 0.2.0:**
+- ✨ County-level repeater downloads
+- ✨ City-level repeater downloads
+- 🔄 Enhanced CLI with mutually-exclusive location options
+- 📖 Backward compatibility maintained for all existing features
+
 ### Install from Source
 
 ```bash
@@ -52,13 +60,19 @@ ham-formatter list-radios
 
 #### Download Repeater Data
 
-Download all repeaters for a state:
+Download repeaters by state, county, or city:
 
 ```bash
-# Download California repeaters
+# Download all California repeaters
 ham-formatter download --state CA --output ca_repeaters.csv
 
-# Download Texas repeaters with verbose output
+# Download repeaters for Los Angeles County only
+ham-formatter download --state CA --county "Los Angeles" --output la_county_repeaters.csv
+
+# Download repeaters for Austin city only
+ham-formatter download --state TX --city Austin --output austin_repeaters.csv
+
+# Download with verbose output
 ham-formatter download --state TX --verbose
 ```
 
@@ -82,8 +96,18 @@ ham-formatter format ca_repeaters.csv --radio k5 --output baofeng_k5_ca.csv
 ```python
 import ham_formatter
 
-# Download repeater data
+# Download repeater data by state
 data = ham_formatter.download_repeater_data(state="CA", country="United States")
+
+# Download repeater data by county
+county_data = ham_formatter.download_repeater_data_by_county(
+    state="CA", county="Los Angeles", country="United States"
+)
+
+# Download repeater data by city
+city_data = ham_formatter.download_repeater_data_by_city(
+    state="TX", city="Austin", country="United States"
+)
 
 # Get a formatter for your radio
 from ham_formatter.radios import get_radio_formatter
@@ -101,14 +125,26 @@ ham_formatter.write_csv(formatted_data, "my_repeaters.csv")
 
 ```python
 import pandas as pd
-from ham_formatter import read_csv, write_csv
+from ham_formatter import (
+    read_csv,
+    write_csv,
+    download_repeater_data_by_county,
+    download_repeater_data_by_city
+)
 from ham_formatter.radios import get_radio_formatter
 
-# Load your own repeater data
-data = read_csv("my_repeaters.csv")
+# Download data for multiple counties in a state
+counties = ["Los Angeles", "Orange", "Riverside"]
+all_data = []
+for county in counties:
+    county_data = download_repeater_data_by_county("CA", county)
+    all_data.append(county_data)
+
+# Combine all county data
+combined_data = pd.concat(all_data, ignore_index=True)
 
 # Filter data (example: only UHF repeaters)
-uhf_data = data[data['frequency'].astype(float) >= 400.0]
+uhf_data = combined_data[combined_data['frequency'].astype(float) >= 400.0]
 
 # Format for multiple radios
 formatters = ['anytone-878', 'baofeng-k5']
