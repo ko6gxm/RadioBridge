@@ -1,0 +1,23 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+click = "*"
+requests = "*"
+pandas = "*"
+python-dateutil = "*"
+beautifulsoup4 = "*"
+lxml = "*"
+
+[dev-packages]
+black = "*"
+flake8 = "*"
+pytest = "*"
+pre-commit = "*"
+ipython = "*"
+
+[requires]
+python_version = "3.13"
+python_full_version = "3.13.7"

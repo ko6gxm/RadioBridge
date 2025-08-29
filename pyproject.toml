@@ -1,0 +1,92 @@
+[project]
+name = "ham-formatter"
+version = "0.1.0"
+description = "Download and format amateur radio repeater lists for various ham radio models"
+authors = [
+    {name = "Craig Simon", email = "craig@example.com"},
+]
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.9"
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Communications :: Ham Radio",
+]
+keywords = ["ham radio", "amateur radio", "repeater", "radio programming"]
+dependencies = [
+    "click>=8.0.0",
+    "requests>=2.25.0",
+    "pandas>=1.3.0",
+    "python-dateutil>=2.8.0",
+    "beautifulsoup4>=4.9.0",
+    "lxml>=4.6.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "black>=22.0.0",
+    "flake8>=4.0.0",
+    "pytest>=7.0.0",
+    "pre-commit>=2.15.0",
+    "ipython>=8.0.0",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/craig/ham-formatter"
+"Bug Tracker" = "https://github.com/craig/ham-formatter/issues"
+"Repository" = "https://github.com/craig/ham-formatter"
+
+[project.scripts]
+ham-formatter = "ham_formatter.cli:main"
+
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.black]
+line-length = 88
+target-version = ['py39']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+  # directories
+  \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | build
+  | dist
+)/
+'''
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = "-ra -q --strict-markers"
+testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: marks tests as integration tests",
+    "unit: marks tests as unit tests",
+]
+
+[tool.flake8]
+max-line-length = 88
+extend-ignore = ["E203", "W503"]
+exclude = [".git", "__pycache__", "build", "dist", ".venv"]

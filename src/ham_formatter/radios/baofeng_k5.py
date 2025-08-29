@@ -1,0 +1,142 @@
+"""Formatter for Baofeng K5 Plus handheld radio."""
+
+from typing import List
+
+import pandas as pd
+
+from .base import BaseRadioFormatter
+
+
+class BaofengK5Formatter(BaseRadioFormatter):
+    """Formatter for Baofeng K5 Plus handheld radio.
+
+    This formatter converts repeater data into the CSV format expected by
+    the Baofeng K5 programming software.
+    """
+
+    @property
+    def radio_name(self) -> str:
+        """Human-readable name of the radio."""
+        return "Baofeng K5 Plus"
+
+    @property
+    def description(self) -> str:
+        """Description of the radio and its capabilities."""
+        return "Compact dual-band analog handheld radio"
+
+    @property
+    def manufacturer(self) -> str:
+        """Radio manufacturer."""
+        return "Baofeng"
+
+    @property
+    def model(self) -> str:
+        """Radio model."""
+        return "K5 Plus"
+
+    @property
+    def required_columns(self) -> List[str]:
+        """List of column names required in the input data."""
+        return ["frequency"]
+
+    @property
+    def output_columns(self) -> List[str]:
+        """List of column names in the formatted output."""
+        return [
+            "Channel",
+            "Channel Name",
+            "RX Frequency",
+            "TX Frequency",
+            "TX Power",
+            "Bandwidth",
+            "RX CTCSS/DCS",
+            "TX CTCSS/DCS",
+            "Busy Lock",
+            "Scrambler",
+            "Compander",
+            "RX Only",
+        ]
+
+    def format(self, data: pd.DataFrame) -> pd.DataFrame:
+        """Format repeater data for Baofeng K5 Plus.
+
+        Args:
+            data: Input DataFrame with repeater information
+
+        Returns:
+            Formatted DataFrame ready for K5 Plus programming software
+        """
+        self.validate_input(data)
+
+        formatted_data = []
+
+        for idx, row in data.iterrows():
+            channel = idx + 1
+
+            rx_freq = self.clean_frequency(row.get("frequency"))
+            if not rx_freq:
+                continue
+
+            # Calculate TX frequency
+            offset = self.clean_offset(row.get("offset", 0))
+            if offset and offset != "0.000000":
+                try:
+                    rx_float = float(rx_freq)
+                    offset_float = float(offset)
+                    tx_freq = f"{rx_float + offset_float:.6f}"
+                except (ValueError, TypeError):
+                    tx_freq = rx_freq
+            else:
+                tx_freq = rx_freq
+
+            # Get tone information
+            tone = self.clean_tone(row.get("tone"))
+
+            # Generate channel name
+            location = row.get("location", row.get("city", ""))
+            callsign = row.get("callsign", "")
+
+            if location and callsign:
+                channel_name = (
+                    f"{location[:6]} {callsign}"  # K5 has very limited display
+                )
+            elif location:
+                channel_name = str(location)[:12]
+            elif callsign:
+                channel_name = str(callsign)
+            else:
+                channel_name = f"CH{channel:03d}"
+
+            # Limit name for K5 Plus display
+            channel_name = channel_name[:12]
+
+            # Determine power based on frequency band
+            rx_float = float(rx_freq)
+            if 136.0 <= rx_float <= 174.0:  # VHF
+                tx_power = "High"  # 5W on VHF
+            elif 400.0 <= rx_float <= 520.0:  # UHF
+                tx_power = "High"  # 4W on UHF
+            else:
+                tx_power = "Low"
+
+            formatted_row = {
+                "Channel": channel,
+                "Channel Name": channel_name,
+                "RX Frequency": rx_freq,
+                "TX Frequency": tx_freq,
+                "TX Power": tx_power,
+                "Bandwidth": "Wide",  # K5 Plus defaults to wide (25kHz)
+                "RX CTCSS/DCS": tone if tone else "Off",
+                "TX CTCSS/DCS": tone if tone else "Off",
+                "Busy Lock": "Off",
+                "Scrambler": "Off",
+                "Compander": "Off",
+                "RX Only": "Off",
+            }
+
+            formatted_data.append(formatted_row)
+
+        if not formatted_data:
+            raise ValueError("No valid repeater data found after formatting")
+
+        return pd.DataFrame(formatted_data)

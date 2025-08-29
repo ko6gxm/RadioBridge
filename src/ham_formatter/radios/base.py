@@ -1,0 +1,175 @@
+"""Base class for radio formatters."""
+
+from abc import ABC, abstractmethod
+from typing import Any, List, Optional
+
+import pandas as pd
+
+
+class BaseRadioFormatter(ABC):
+    """Abstract base class for radio formatters.
+
+    All radio formatters must inherit from this class and implement
+    the required methods for converting repeater data to their specific format.
+    """
+
+    def __init__(self):
+        """Initialize the formatter."""
+        pass
+
+    @property
+    @abstractmethod
+    def radio_name(self) -> str:
+        """Human-readable name of the radio."""
+        pass
+
+    @property
+    @abstractmethod
+    def description(self) -> str:
+        """Description of the radio and its capabilities."""
+        pass
+
+    @property
+    @abstractmethod
+    def required_columns(self) -> List[str]:
+        """List of column names required in the input data."""
+        pass
+
+    @property
+    @abstractmethod
+    def output_columns(self) -> List[str]:
+        """List of column names in the formatted output."""
+        pass
+
+    @abstractmethod
+    def format(self, data: pd.DataFrame) -> pd.DataFrame:
+        """Format repeater data for this radio.
+
+        Args:
+            data: Input DataFrame with repeater information
+
+        Returns:
+            Formatted DataFrame ready for radio programming software
+
+        Raises:
+            ValueError: If input data is invalid or missing required columns
+        """
+        pass
+
+    def validate_input(self, data: pd.DataFrame) -> bool:
+        """Validate that input data has required columns.
+
+        Args:
+            data: Input DataFrame to validate
+
+        Returns:
+            True if validation passes
+
+        Raises:
+            ValueError: If validation fails
+        """
+        if data.empty:
+            raise ValueError("Input data is empty")
+
+        missing_columns = [
+            col for col in self.required_columns if col not in data.columns
+        ]
+
+        if missing_columns:
+            raise ValueError(
+                f"Missing required columns for {self.radio_name}: {missing_columns}. "
+                f"Available columns: {list(data.columns)}"
+            )
+
+        return True
+
+    def clean_frequency(self, freq: Any) -> Optional[str]:
+        """Clean and format frequency data.
+
+        Args:
+            freq: Frequency value (string or numeric)
+
+        Returns:
+            Cleaned frequency string or None if invalid
+        """
+        if pd.isna(freq):
+            return None
+
+        freq_str = str(freq).strip()
+        if not freq_str:
+            return None
+
+        # Remove common formatting
+        freq_str = freq_str.replace(" MHz", "").replace("MHz", "").replace(" ", "")
+
+        try:
+            # Convert to float and back to string for consistency
+            freq_float = float(freq_str)
+            return f"{freq_float:.6f}"
+        except ValueError:
+            return None
+
+    def clean_tone(self, tone: Any) -> Optional[str]:
+        """Clean and format tone data.
+
+        Args:
+            tone: Tone value
+
+        Returns:
+            Cleaned tone string or None if invalid
+        """
+        if pd.isna(tone):
+            return None
+
+        tone_str = str(tone).strip()
+        if not tone_str or tone_str.lower() in ("none", "n/a", "na", ""):
+            return None
+
+        # Remove common formatting
+        tone_str = tone_str.replace(" Hz", "").replace("Hz", "").replace(" ", "")
+
+        try:
+            # Validate it's a reasonable tone frequency
+            tone_float = float(tone_str)
+            if 50.0 <= tone_float <= 300.0:  # Reasonable range for CTCSS tones
+                return f"{tone_float:.1f}"
+        except ValueError:
+            pass
+
+        return tone_str  # Return as-is if it's not numeric but not empty
+
+    def clean_offset(self, offset: Any) -> Optional[str]:
+        """Clean and format offset data.
+
+        Args:
+            offset: Offset value
+
+        Returns:
+            Cleaned offset string or None if invalid
+        """
+        if pd.isna(offset):
+            return None
+
+        offset_str = str(offset).strip()
+        if not offset_str:
+            return None
+
+        # Standardize common offset formats
+        offset_str = offset_str.replace(" MHz", "").replace("MHz", "").replace(" ", "")
+
+        # Handle +/- prefixes
+        if offset_str.startswith(("+", "-")):
+            try:
+                offset_float = float(offset_str)
+                return f"{offset_float:+.6f}"
+            except ValueError:
+                return offset_str
+
+        try:
+            offset_float = float(offset_str)
+            if offset_float != 0:
+                return f"{offset_float:+.6f}"  # Add + prefix for positive values
+            else:
+                return "0.000000"
+        except ValueError:
+            return offset_str
