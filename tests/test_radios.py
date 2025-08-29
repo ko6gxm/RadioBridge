@@ -17,7 +17,7 @@ class TestRadioRegistry:
         assert isinstance(radios, list)
         assert len(radios) > 0
 
-        expected_radios = ["anytone-878", "anytone-578", "baofeng-dn32uv", "baofeng-k5"]
+        expected_radios = ["anytone-878", "anytone-578", "baofeng-dm32uv", "baofeng-k5"]
         for radio in expected_radios:
             assert radio in radios
 

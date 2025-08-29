@@ -10,14 +10,14 @@ from typing import Dict, List, Optional, Type
 from .base import BaseRadioFormatter
 from .anytone_878 import Anytone878Formatter
 from .anytone_578 import Anytone578Formatter
-from .baofeng_dn32uv import BaofengDN32UVFormatter
+from .baofeng_dm32uv import BaofengDM32UVFormatter
 from .baofeng_k5 import BaofengK5Formatter
 
 # Registry of all available radio formatters
 RADIO_FORMATTERS: Dict[str, Type[BaseRadioFormatter]] = {
     "anytone-878": Anytone878Formatter,
     "anytone-578": Anytone578Formatter,
-    "baofeng-dn32uv": BaofengDN32UVFormatter,
+    "baofeng-dm32uv": BaofengDM32UVFormatter,
     "baofeng-k5": BaofengK5Formatter,
 }
 
@@ -29,8 +29,9 @@ RADIO_ALIASES: Dict[str, str] = {
     "anytone578": "anytone-578",
     "anytone_578": "anytone-578",
     "578": "anytone-578",
-    "dn32uv": "baofeng-dn32uv",
-    "dn32": "baofeng-dn32uv",
+    "dm32uv": "baofeng-dm32uv",
+    "dm32": "baofeng-dm32uv",
+    "dm-32uv": "baofeng-dm32uv",
     "k5": "baofeng-k5",
     "k5plus": "baofeng-k5",
     "k5+": "baofeng-k5",

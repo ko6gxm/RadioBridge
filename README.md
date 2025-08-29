@@ -13,7 +13,7 @@ Ham Formatter is a Python tool that downloads repeater information from Repeater
 
 - **Anytone AT-D878UV II (Plus)** - DMR/Analog handheld with GPS and Bluetooth
 - **Anytone AT-D578UV III (Plus)** - DMR/Analog mobile radio with GPS and APRS
-- **Baofeng DN32UV** - Dual-band analog handheld with programmable memories
+- **Baofeng DM-32UV** - Dual-band DMR/analog handheld with digital and analog modes
 - **Baofeng K5 Plus** - Compact dual-band analog handheld radio
 
 ## Features
@@ -69,6 +69,9 @@ Format downloaded data for a specific radio model:
 ```bash
 # Format for Anytone 878
 ham-formatter format ca_repeaters.csv --radio anytone-878 --output anytone_878_ca.csv
+
+# Format for Baofeng DM-32UV
+ham-formatter format ca_repeaters.csv --radio dm32uv --output baofeng_dm32uv_ca.csv
 
 # Format for Baofeng K5 Plus
 ham-formatter format ca_repeaters.csv --radio k5 --output baofeng_k5_ca.csv
@@ -180,7 +183,7 @@ ham_formatter/
 │       ├── base.py             # Base formatter class
 │       ├── anytone_878.py      # Anytone 878 formatter
 │       ├── anytone_578.py      # Anytone 578 formatter
-│       ├── baofeng_dn32uv.py   # Baofeng DN32UV formatter
+│       ├── baofeng_dm32uv.py   # Baofeng DM-32UV formatter
 │       └── baofeng_k5.py       # Baofeng K5 Plus formatter
 ├── tests/                       # Test suite
 ├── docs/                        # Documentation
