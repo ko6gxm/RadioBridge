@@ -1,6 +1,6 @@
 [project]
 name = "ham-formatter"
-version = "0.1.0"
+version = "0.2.0"
 description = "Download and format amateur radio repeater lists for various ham radio models"
 authors = [
     {name = "Craig Simon", email = "craig@example.com"},

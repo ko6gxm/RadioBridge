@@ -83,6 +83,9 @@ class Anytone878Formatter(BaseRadioFormatter):
         """
         self.validate_input(data)
 
+        self.logger.info(f"Starting format operation for {len(data)} repeaters")
+        self.logger.debug(f"Input columns: {list(data.columns)}")
+
         # Create output DataFrame with required structure
         formatted_data = []
 
@@ -92,6 +95,9 @@ class Anytone878Formatter(BaseRadioFormatter):
             # Extract and clean data
             rx_freq = self.clean_frequency(row.get("frequency"))
             if not rx_freq:
+                self.logger.debug(
+                    f"Skipping row {idx}: invalid frequency {row.get('frequency')}"
+                )
                 continue  # Skip rows without valid frequency
 
             # Calculate transmit frequency from offset if available
@@ -162,8 +168,16 @@ class Anytone878Formatter(BaseRadioFormatter):
             }
 
             formatted_data.append(formatted_row)
+            self.logger.debug(
+                f"Formatted channel {channel_num}: {channel_name} @ {rx_freq}"
+            )
 
         if not formatted_data:
+            self.logger.error("No valid repeater data found after formatting")
             raise ValueError("No valid repeater data found after formatting")
 
-        return pd.DataFrame(formatted_data)
+        result_df = pd.DataFrame(formatted_data)
+        self.logger.info(
+            f"Format operation complete: {len(result_df)} channels formatted"
+        )
+        return result_df

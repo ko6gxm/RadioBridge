@@ -202,8 +202,9 @@ class TestDownloadCommand:
             finally:
                 os.chdir(original_cwd)
 
+    @patch("ham_formatter.cli.write_csv")
     @patch("ham_formatter.cli.download_repeater_data_by_county")
-    def test_download_verbose_county(self, mock_download_county):
+    def test_download_verbose_county(self, mock_download_county, mock_write_csv):
         """Test verbose output for county download."""
         mock_download_county.return_value = self.sample_data
 
@@ -211,6 +212,7 @@ class TestDownloadCommand:
             result = self.runner.invoke(
                 main,
                 [
+                    "--verbose",
                     "download",
                     "--state",
                     "CA",
@@ -218,15 +220,14 @@ class TestDownloadCommand:
                     "Los Angeles",
                     "--output",
                     str(Path(tmpdir) / "test.csv"),
-                    "--verbose",
                 ],
             )
 
         assert result.exit_code == 0
-        assert (
-            "Downloading repeater data for Los Angeles County, CA, United States..."
-            in result.output
+        mock_download_county.assert_called_once_with(
+            state="CA", county="Los Angeles", country="United States"
         )
+        mock_write_csv.assert_called_once()
 
     @patch("ham_formatter.cli.download_repeater_data")
     def test_download_error_handling(self, mock_download):

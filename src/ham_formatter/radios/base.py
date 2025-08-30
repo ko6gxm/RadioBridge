@@ -5,6 +5,8 @@ from typing import Any, List, Optional
 
 import pandas as pd
 
+from ham_formatter.logging_config import get_logger
+
 
 class BaseRadioFormatter(ABC):
     """Abstract base class for radio formatters.
@@ -15,7 +17,8 @@ class BaseRadioFormatter(ABC):
 
     def __init__(self):
         """Initialize the formatter."""
-        pass
+        self.logger = get_logger(self.__class__.__module__)
+        self.logger.info(f"Initialized {self.radio_name} formatter")
 
     @property
     @abstractmethod
@@ -68,7 +71,14 @@ class BaseRadioFormatter(ABC):
         Raises:
             ValueError: If validation fails
         """
+        self.logger.debug(
+            f"Validating input data: {len(data)} rows, {len(data.columns)} columns"
+        )
+        self.logger.debug(f"Required columns: {self.required_columns}")
+        self.logger.debug(f"Available columns: {list(data.columns)}")
+
         if data.empty:
+            self.logger.error("Input data is empty")
             raise ValueError("Input data is empty")
 
         missing_columns = [
@@ -76,11 +86,13 @@ class BaseRadioFormatter(ABC):
         ]
 
         if missing_columns:
+            self.logger.error(f"Missing required columns: {missing_columns}")
             raise ValueError(
                 f"Missing required columns for {self.radio_name}: {missing_columns}. "
                 f"Available columns: {list(data.columns)}"
             )
 
+        self.logger.info(f"Input validation passed for {self.radio_name} formatter")
         return True
 
     def clean_frequency(self, freq: Any) -> Optional[str]:

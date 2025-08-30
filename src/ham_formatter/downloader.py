@@ -6,6 +6,8 @@ import pandas as pd
 import requests
 from bs4 import BeautifulSoup
 
+from ham_formatter.logging_config import get_logger
+
 
 class RepeaterBookDownloader:
     """Download repeater data from RepeaterBook.com."""
@@ -23,6 +25,8 @@ class RepeaterBookDownloader:
         self.session.headers.update(
             {"User-Agent": "ham-formatter/0.2.0 (Amateur Radio Tool)"}
         )
+        self.logger = get_logger(__name__)
+        self.logger.debug(f"RepeaterBookDownloader initialized with timeout={timeout}s")
 
     def download_by_state(
         self, state: str, country: str = "United States"
@@ -91,12 +95,17 @@ class RepeaterBookDownloader:
             DataFrame containing repeater information
         """
         params = self._build_params(level, **kwargs)
+        self.logger.debug(f"Download parameters: {params}")
 
         # First, try to get CSV export if available
         csv_data = self._try_csv_export(params)
         if csv_data is not None:
+            self.logger.info(
+                f"Successfully downloaded data via CSV export ({len(csv_data)} rows)"
+            )
             return csv_data
 
+        self.logger.info("CSV export not available, falling back to HTML scraping")
         # Fall back to HTML scraping
         return self._scrape_html_table(params)
 
@@ -154,9 +163,17 @@ class RepeaterBookDownloader:
         if "city" in params:
             csv_params["city"] = params["city"]
 
+        self.logger.debug(
+            f"Attempting CSV export from {csv_url} with params: {csv_params}"
+        )
+
         try:
             response = self.session.get(
                 csv_url, params=csv_params, timeout=self.timeout
+            )
+
+            self.logger.debug(
+                f"CSV export response: {response.status_code} {response.headers.get('content-type', 'unknown')}"
             )
 
             if response.status_code == 200 and "text/csv" in response.headers.get(
@@ -167,8 +184,9 @@ class RepeaterBookDownloader:
 
                 return pd.read_csv(StringIO(response.text))
 
-        except Exception:
+        except Exception as e:
             # CSV export not available or failed, will fall back to HTML scraping
+            self.logger.debug(f"CSV export failed: {e}")
             pass
 
         return None
@@ -189,15 +207,23 @@ class RepeaterBookDownloader:
         # RepeaterBook.com search URL (this URL structure may need verification)
         search_url = f"{self.BASE_URL}/repeaters/index.php"
 
+        self.logger.debug(f"Scraping HTML from {search_url} with params: {params}")
+
         try:
             response = self.session.get(search_url, params=params, timeout=self.timeout)
             response.raise_for_status()
 
+            self.logger.debug(
+                f"HTML response: {response.status_code} ({len(response.content)} bytes)"
+            )
+
         except requests.RequestException as e:
+            self.logger.error(f"HTTP request failed: {e}")
             raise requests.RequestException(f"Failed to download repeater data: {e}")
 
         # Parse HTML
         soup = BeautifulSoup(response.content, "html.parser")
+        self.logger.debug("Parsing HTML content for repeater table")
 
         # Find the repeater table (this selector may need adjustment)
         table = soup.find(
@@ -205,10 +231,12 @@ class RepeaterBookDownloader:
         )  # Common class for RepeaterBook tables
 
         if not table:
+            self.logger.debug("w3-table class not found, trying alternative selectors")
             # Try alternative selectors
             table = soup.find("table", id="repeaters")
             if not table:
                 tables = soup.find_all("table")
+                self.logger.debug(f"Found {len(tables)} tables, selecting largest")
                 if tables:
                     # Take the largest table assuming it's the repeater data
                     table = max(tables, key=lambda t: len(t.find_all("tr")))
@@ -233,13 +261,19 @@ class RepeaterBookDownloader:
                 raise ValueError("No data found in HTML table")
 
             df = dfs[0]  # Take the first (and likely only) table
+            self.logger.info(
+                f"Successfully parsed HTML table: {len(df)} rows, {len(df.columns)} columns"
+            )
+            self.logger.debug(f"Table columns: {list(df.columns)}")
 
             # Basic cleaning
             df = self._clean_scraped_data(df)
+            self.logger.info(f"Data cleaning complete: {len(df)} rows after cleaning")
 
             return df
 
         except Exception as e:
+            self.logger.error(f"Table parsing failed: {e}")
             raise ValueError(f"Failed to parse repeater table: {e}")
 
     def _clean_scraped_data(self, df: pd.DataFrame) -> pd.DataFrame:
@@ -251,11 +285,21 @@ class RepeaterBookDownloader:
         Returns:
             Cleaned DataFrame
         """
+        self.logger.debug(
+            f"Starting data cleaning: {len(df)} rows, {len(df.columns)} columns"
+        )
+
         # Remove any completely empty rows
+        rows_before = len(df)
         df = df.dropna(how="all")
+        if len(df) < rows_before:
+            self.logger.debug(f"Removed {rows_before - len(df)} empty rows")
 
         # Strip whitespace from all string columns and replace empty strings with NaN
         string_columns = df.select_dtypes(include=["object"]).columns
+        self.logger.debug(
+            f"Cleaning {len(string_columns)} string columns: {list(string_columns)}"
+        )
         for col in string_columns:
             if hasattr(df[col], "str"):
                 df[col] = df[col].str.strip()
@@ -277,9 +321,18 @@ class RepeaterBookDownloader:
         }
 
         # Rename columns if they match our mapping
+        original_columns = list(df.columns)
         df.columns = [
             column_mapping.get(col, col.lower().replace(" ", "_")) for col in df.columns
         ]
+
+        renamed_cols = [
+            f"{orig} -> {new}"
+            for orig, new in zip(original_columns, df.columns)
+            if orig != new
+        ]
+        if renamed_cols:
+            self.logger.debug(f"Column mappings: {', '.join(renamed_cols)}")
 
         return df
 

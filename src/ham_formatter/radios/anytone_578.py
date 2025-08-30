@@ -81,6 +81,9 @@ class Anytone578Formatter(BaseRadioFormatter):
         """
         self.validate_input(data)
 
+        self.logger.info(f"Starting format operation for {len(data)} repeaters")
+        self.logger.debug(f"Input columns: {list(data.columns)}")
+
         formatted_data = []
 
         for idx, row in data.iterrows():
@@ -88,6 +91,9 @@ class Anytone578Formatter(BaseRadioFormatter):
 
             rx_freq = self.clean_frequency(row.get("frequency"))
             if not rx_freq:
+                self.logger.debug(
+                    f"Skipping row {idx}: invalid frequency {row.get('frequency')}"
+                )
                 continue
 
             # Calculate TX frequency
@@ -98,9 +104,9 @@ class Anytone578Formatter(BaseRadioFormatter):
                     offset_float = float(offset)
                     tx_freq = f"{rx_float + offset_float:.6f}"
                 except (ValueError, TypeError):
-                    tx_freq = rx_freq
+                    tx_freq = rx_freq  # Simplex if offset calculation fails
             else:
-                tx_freq = rx_freq
+                tx_freq = rx_freq  # Simplex
 
             tone = self.clean_tone(row.get("tone"))
 
@@ -149,8 +155,16 @@ class Anytone578Formatter(BaseRadioFormatter):
             }
 
             formatted_data.append(formatted_row)
+            self.logger.debug(
+                f"Formatted channel {channel_num}: {channel_name} @ {rx_freq}"
+            )
 
         if not formatted_data:
+            self.logger.error("No valid repeater data found after formatting")
             raise ValueError("No valid repeater data found after formatting")
 
-        return pd.DataFrame(formatted_data)
+        result_df = pd.DataFrame(formatted_data)
+        self.logger.info(
+            f"Format operation complete: {len(result_df)} channels formatted"
+        )
+        return result_df

@@ -37,6 +37,7 @@ Ham Formatter is a Python tool that downloads repeater information from Repeater
 - ✨ County-level repeater downloads
 - ✨ City-level repeater downloads
 - 🔄 Enhanced CLI with mutually-exclusive location options
+- 📊 Comprehensive logging with verbose mode support
 - 📖 Backward compatibility maintained for all existing features
 
 ### Install from Source
@@ -72,8 +73,11 @@ ham-formatter download --state CA --county "Los Angeles" --output la_county_repe
 # Download repeaters for Austin city only
 ham-formatter download --state TX --city Austin --output austin_repeaters.csv
 
-# Download with verbose output
-ham-formatter download --state TX --verbose
+# Download with verbose logging (shows detailed progress)
+ham-formatter --verbose download --state TX
+
+# Save logs to a file
+ham-formatter --verbose --log-file ham_formatter.log download --state TX
 ```
 
 #### Format Data for Radio
@@ -87,8 +91,8 @@ ham-formatter format ca_repeaters.csv --radio anytone-878 --output anytone_878_c
 # Format for Baofeng DM-32UV
 ham-formatter format ca_repeaters.csv --radio dm32uv --output baofeng_dm32uv_ca.csv
 
-# Format for Baofeng K5 Plus
-ham-formatter format ca_repeaters.csv --radio k5 --output baofeng_k5_ca.csv
+# Format for Baofeng K5 Plus with verbose logging
+ham-formatter --verbose format ca_repeaters.csv --radio k5 --output baofeng_k5_ca.csv
 ```
 
 ### Python Library Usage
@@ -117,6 +121,11 @@ formatted_data = formatter.format(data)
 
 # Save formatted data
 ham_formatter.write_csv(formatted_data, "my_repeaters.csv")
+
+# Note: Python library mode uses the same logging configuration
+# To enable verbose logging in your scripts:
+from ham_formatter.logging_config import setup_logging
+setup_logging(verbose=True)  # Enable debug-level logging
 ```
 
 ### Advanced Usage
@@ -152,6 +161,9 @@ for radio in formatters:
     formatter = get_radio_formatter(radio)
     formatted = formatter.format(uhf_data)
     write_csv(formatted, f"{radio}_uhf_repeaters.csv")
+
+# Enable logging for troubleshooting
+setup_logging(verbose=True, log_file="processing.log")
 ```
 
 ## Development
@@ -204,6 +216,47 @@ pipenv run flake8 src/ tests/
 # Run pre-commit hooks manually
 pipenv run pre-commit run --all-files
 ```
+
+### Logging
+
+Ham Formatter includes comprehensive logging to help with debugging and monitoring:
+
+#### Log Levels
+- **INFO**: Normal operation messages (file operations, progress updates)
+- **DEBUG**: Detailed diagnostic information (HTTP requests, data processing steps)
+- **WARNING**: Non-fatal issues that may need attention
+- **ERROR**: Error conditions that prevent normal operation
+
+#### CLI Logging
+```bash
+# Normal operation (INFO level)
+ham-formatter download --state CA
+
+# Verbose mode (DEBUG level) - shows detailed progress
+ham-formatter --verbose download --state CA
+
+# Save logs to file
+ham-formatter --verbose --log-file debug.log download --state CA
+```
+
+#### Python Library Logging
+```python
+from ham_formatter.logging_config import setup_logging
+
+# Setup logging for your script
+setup_logging(verbose=True)  # Enable DEBUG level
+setup_logging(verbose=False, log_file="app.log")  # INFO to file
+
+# All ham_formatter operations will now log appropriately
+import ham_formatter
+data = ham_formatter.download_repeater_data("CA")
+```
+
+#### What Gets Logged
+- **Download operations**: HTTP requests, response status, data parsing
+- **File operations**: CSV read/write operations, file paths
+- **Radio formatting**: Formatter selection, data validation, processing steps
+- **Error conditions**: Network failures, parsing errors, invalid data
 
 ### Project Structure
 

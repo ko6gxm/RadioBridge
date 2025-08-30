@@ -13,19 +13,27 @@ from ham_formatter.downloader import (
     download_repeater_data_by_county,
     download_repeater_data_by_city,
 )
+from ham_formatter.logging_config import setup_logging, get_logger
 from ham_formatter.radios import get_supported_radios, get_radio_formatter
 
 
 @click.group()
 @click.version_option(version=__version__)
+@click.option("--verbose", "-v", is_flag=True, help="Enable verbose logging output")
+@click.option("--log-file", type=click.Path(), help="Write logs to specified file")
 @click.pass_context
-def main(ctx: click.Context) -> None:
+def main(ctx: click.Context, verbose: bool, log_file: Optional[str]) -> None:
     """Ham Formatter - Download and format amateur radio repeater lists.
 
     A tool for downloading repeater information from RepeaterBook.com and formatting
     it for various ham radio models including Anytone, Baofeng, and others.
     """
     ctx.ensure_object(dict)
+    ctx.obj["verbose"] = verbose
+    ctx.obj["log_file"] = log_file
+
+    # Set up logging early
+    setup_logging(verbose=verbose, log_file=log_file)
 
 
 @main.command()
@@ -54,14 +62,14 @@ def main(ctx: click.Context) -> None:
     type=click.Path(path_type=Path),
     help="Output file path (default: auto-generated based on search criteria)",
 )
-@click.option("--verbose", "-v", is_flag=True, help="Enable verbose output")
+@click.pass_context
 def download(
+    ctx: click.Context,
     state: Optional[str],
     county: Optional[str],
     city: Optional[str],
     country: str,
     output: Optional[Path],
-    verbose: bool,
 ) -> None:
     """Download repeater data from RepeaterBook.com.
 
@@ -72,6 +80,8 @@ def download(
 
     Note: --state is required for all searches.
     """
+    logger = get_logger(__name__)
+
     # Validate search criteria
     search_options = [bool(county), bool(city)]
     num_search_options = sum(search_options)
@@ -91,18 +101,13 @@ def download(
     # Determine search type and parameters
     if county:
         search_type = "county"
-        if verbose:
-            click.echo(
-                f"Downloading repeater data for {county} County, {state}, {country}..."
-            )
+        logger.info(f"Starting download for {county} County, {state}, {country}")
     elif city:
         search_type = "city"
-        if verbose:
-            click.echo(f"Downloading repeater data for {city}, {state}, {country}...")
+        logger.info(f"Starting download for {city}, {state}, {country}")
     else:
         search_type = "state"
-        if verbose:
-            click.echo(f"Downloading repeater data for {state}, {country}...")
+        logger.info(f"Starting download for {state}, {country}")
 
     try:
         # Call appropriate download function
@@ -142,8 +147,10 @@ def download(
         click.echo(
             f"Successfully downloaded {len(data)} repeaters from {location} to {output}"
         )
+        logger.info(f"Download completed: {len(data)} repeaters saved to {output}")
 
     except Exception as e:
+        logger.error(f"Download failed: {e}")
         click.echo(f"Error: {e}", err=True)
         sys.exit(1)
 
@@ -162,11 +169,13 @@ def download(
     type=click.Path(path_type=Path),
     help="Output file path (default: formatted_<radio>_<input_name>.csv)",
 )
-@click.option("--verbose", "-v", is_flag=True, help="Enable verbose output")
-def format(input_file: Path, radio: str, output: Optional[Path], verbose: bool) -> None:
+@click.pass_context
+def format(
+    ctx: click.Context, input_file: Path, radio: str, output: Optional[Path]
+) -> None:
     """Format repeater data for a specific radio model."""
-    if verbose:
-        click.echo(f"Formatting {input_file} for {radio}...")
+    logger = get_logger(__name__)
+    logger.info(f"Starting format operation: {input_file} for {radio}")
 
     try:
         # Load the data
@@ -197,8 +206,12 @@ def format(input_file: Path, radio: str, output: Optional[Path], verbose: bool) 
             f"Successfully formatted {len(formatted_data)} entries for "
             f"{radio} to {output}"
         )
+        logger.info(
+            f"Format completed: {len(formatted_data)} entries for {radio} saved to {output}"
+        )
 
     except Exception as e:
+        logger.error(f"Format failed: {e}")
         click.echo(f"Error: {e}", err=True)
         sys.exit(1)
 

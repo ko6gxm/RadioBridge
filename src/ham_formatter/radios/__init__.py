@@ -7,6 +7,7 @@ required by that radio's programming software.
 
 from typing import Dict, List, Optional, Type
 
+from ham_formatter.logging_config import get_logger
 from .base import BaseRadioFormatter
 from .anytone_878 import Anytone878Formatter
 from .anytone_578 import Anytone578Formatter
@@ -56,20 +57,30 @@ def get_radio_formatter(radio_name: str) -> Optional[BaseRadioFormatter]:
     Returns:
         Formatter instance if found, None otherwise
     """
+    logger = get_logger(__name__)
+    logger.debug(f"Looking for formatter for radio: {radio_name}")
+
     # Normalize the radio name
     normalized_name = radio_name.lower().strip()
 
     # Check for direct match
     if normalized_name in RADIO_FORMATTERS:
         formatter_class = RADIO_FORMATTERS[normalized_name]
+        logger.info(
+            f"Found direct match for {radio_name} -> {formatter_class.__name__}"
+        )
         return formatter_class()
 
     # Check for alias match
     if normalized_name in RADIO_ALIASES:
         canonical_name = RADIO_ALIASES[normalized_name]
         formatter_class = RADIO_FORMATTERS[canonical_name]
+        logger.info(
+            f"Found alias match for {radio_name} -> {canonical_name} -> {formatter_class.__name__}"
+        )
         return formatter_class()
 
+    logger.warning(f"No formatter found for radio: {radio_name}")
     return None
 
 
