@@ -333,7 +333,16 @@ class DetailedRepeaterDownloader(RepeaterBookDownloader):
             if id_match:
                 detail_data["repeater_id"] = id_match.group(1)
 
-            # Extract key-value pairs from text
+            # Extract specific frequency information with targeted patterns
+            self._extract_frequency_data(text, detail_data)
+
+            # Extract DMR-specific information
+            self._extract_dmr_data(text, detail_data)
+
+            # Extract talkgroup information for DMR repeaters
+            self._extract_talkgroup_data(text, detail_data)
+
+            # Extract key-value pairs from text for other information
             lines = text.split("\n")
             for line in lines:
                 line = line.strip()
@@ -354,11 +363,6 @@ class DetailedRepeaterDownloader(RepeaterBookDownloader):
             echolink_data = self._extract_echolink_info(soup, detail_url)
             if echolink_data:
                 detail_data.update(echolink_data)
-
-            # Extract frequencies with regex
-            freq_matches = re.findall(r"(\d+\.\d+)", text)
-            if freq_matches:
-                detail_data["frequencies_found"] = freq_matches
 
             # Extract grid squares
             grid_matches = re.findall(r"[A-Z]{2}\d{2}[a-z]{2}", text)
@@ -577,6 +581,81 @@ class DetailedRepeaterDownloader(RepeaterBookDownloader):
             status_data["echolink_error"] = str(e)
 
         return status_data
+
+    def _extract_frequency_data(self, text: str, detail_data: Dict[str, Any]) -> None:
+        """Extract frequency information with targeted patterns.
+
+        Args:
+            text: Page text to parse
+            detail_data: Dictionary to store extracted data
+        """
+        # Extract downlink frequency
+        downlink_match = re.search(r"Downlink:\s*(\d+\.\d+)", text)
+        if downlink_match:
+            detail_data["downlink_freq"] = downlink_match.group(1)
+
+        # Extract uplink frequency
+        uplink_match = re.search(r"Uplink:\s*(\d+\.\d+)", text)
+        if uplink_match:
+            detail_data["uplink_freq"] = uplink_match.group(1)
+
+        # Extract offset with sign
+        offset_match = re.search(r"Offset:\s*([+-]?\d+\.\d+)\s*MHz", text)
+        if offset_match:
+            detail_data["offset_mhz"] = offset_match.group(1)
+
+    def _extract_dmr_data(self, text: str, detail_data: Dict[str, Any]) -> None:
+        """Extract DMR-specific information.
+
+        Args:
+            text: Page text to parse
+            detail_data: Dictionary to store extracted data
+        """
+        # Extract color code
+        color_code_match = re.search(r"DMR Color Code:\s*(\d+)", text)
+        if color_code_match:
+            detail_data["dmr_color_code"] = color_code_match.group(1)
+
+        # Extract DMR ID
+        dmr_id_match = re.search(r"DMR.*?ID:\s*(\d+)", text)
+        if dmr_id_match:
+            detail_data["dmr_id"] = dmr_id_match.group(1)
+
+        # Check if it's a DMR repeater
+        if "DMR" in text:
+            detail_data["is_dmr"] = "true"
+
+    def _extract_talkgroup_data(self, text: str, detail_data: Dict[str, Any]) -> None:
+        """Extract and format talkgroup information for DMR repeaters.
+
+        Args:
+            text: Page text to parse
+            detail_data: Dictionary to store extracted data
+        """
+        # Extract talkgroups with format "TS1 TG91 🔊 = 91"
+        talkgroup_pattern = r"(TS[12])\s+(TG\d+)\s*🔊\s*=\s*(\d+)"
+        talkgroup_matches = re.findall(talkgroup_pattern, text)
+
+        if talkgroup_matches:
+            # Format talkgroups as "TS1:TG91,TS2:TG95" etc
+            talkgroup_list = []
+            for ts, tg, tg_num in talkgroup_matches:
+                talkgroup_list.append(f"{ts}:{tg}")
+
+            # Store as comma-separated string
+            detail_data["talkgroups"] = ",".join(talkgroup_list)
+
+            # Also store count
+            detail_data["talkgroup_count"] = str(len(talkgroup_matches))
+
+            # Separate by timeslot for convenience
+            ts1_groups = [f"{tg}" for ts, tg, _ in talkgroup_matches if ts == "TS1"]
+            ts2_groups = [f"{tg}" for ts, tg, _ in talkgroup_matches if ts == "TS2"]
+
+            if ts1_groups:
+                detail_data["ts1_talkgroups"] = ",".join(ts1_groups)
+            if ts2_groups:
+                detail_data["ts2_talkgroups"] = ",".join(ts2_groups)
 
     # Override the base _download method to use our enhanced scraping
     def _download(self, level: str, **kwargs) -> pd.DataFrame:
