@@ -101,7 +101,9 @@ class BaofengDM32UVFormatter(BaseRadioFormatter):
         self.logger.debug(f"Input columns: {list(data.columns)}")
 
         formatted_data = []
+        channel_names = []  # Collect names for conflict resolution
 
+        # First pass: collect all data and generate initial channel names
         for idx, row in data.iterrows():
             channel = idx + start_channel
 
@@ -132,6 +134,8 @@ class BaofengDM32UVFormatter(BaseRadioFormatter):
             channel_name = self.build_channel_name(row, max_length=16, location_slice=8)
             if not channel_name:
                 channel_name = f"CH{channel:03d}"
+
+            channel_names.append(channel_name)
 
             # Determine if this is a digital repeater (DMR)
             # Check for DMR indicators in the data
@@ -211,6 +215,15 @@ class BaofengDM32UVFormatter(BaseRadioFormatter):
         if not formatted_data:
             self.logger.error("No valid repeater data found after formatting")
             raise ValueError("No valid repeater data found after formatting")
+
+        # Resolve channel name conflicts
+        resolved_names = self.resolve_channel_name_conflicts(
+            channel_names, max_length=16
+        )
+
+        # Update the channel names in formatted data
+        for i, resolved_name in enumerate(resolved_names):
+            formatted_data[i]["Channel Name"] = resolved_name
 
         result_df = pd.DataFrame(formatted_data)
         self.logger.info(

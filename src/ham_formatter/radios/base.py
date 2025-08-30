@@ -309,3 +309,145 @@ class BaseRadioFormatter(ABC):
             name = ""
 
         return name[:max_length]
+
+    def resolve_channel_name_conflicts(
+        self, channel_names: List[str], max_length: int
+    ) -> List[str]:
+        """Resolve channel name conflicts by adding numbers.
+
+        Uses a global numbering approach to ensure all names are unique.
+
+        Args:
+            channel_names: List of channel names that may have conflicts
+            max_length: Maximum length for channel names
+
+        Returns:
+            List of unique channel names with conflicts resolved
+        """
+        used_names = set()
+        resolved_names = []
+
+        for name in channel_names:
+            if name not in used_names:
+                # Name is unique, use as-is
+                resolved_names.append(name)
+                used_names.add(name)
+            else:
+                # Name conflicts, find a unique variant
+                unique_name = self._find_unique_name(name, used_names, max_length)
+                resolved_names.append(unique_name)
+                used_names.add(unique_name)
+
+        return resolved_names
+
+    def _find_unique_name(
+        self, base_name: str, used_names: set, max_length: int
+    ) -> str:
+        """Find a unique variant of base_name that hasn't been used.
+
+        Strategy:
+        1. Try shortening the location part and adding numbers
+        2. If base_name has format 'CALLSIGN-LOCATION', progressively shorten LOCATION
+        3. Add numbers until we find an unused name
+
+        Args:
+            base_name: The conflicting name to make unique
+            used_names: Set of names already in use
+            max_length: Maximum length for the name
+
+        Returns:
+            A unique name that fits within max_length
+        """
+        if "-" in base_name:
+            callsign, location = base_name.split("-", 1)
+
+            # Try progressively shorter location names with numbers
+            for loc_len in range(len(location), 0, -1):
+                for num in range(1, 100):  # Try numbers 1-99
+                    # Calculate space needed for the number
+                    num_str = str(num)
+                    available_for_location = (
+                        max_length - len(callsign) - 1 - len(num_str)
+                    )
+
+                    if available_for_location > 0:
+                        shortened_loc = location[: min(loc_len, available_for_location)]
+                        candidate = f"{callsign}-{shortened_loc}{num}"
+
+                        if candidate not in used_names and len(candidate) <= max_length:
+                            return candidate
+        else:
+            # For names without "-", just add numbers to the end
+            for num in range(1, 100):
+                num_str = str(num)
+                available_for_base = max_length - len(num_str)
+                base_part = base_name[:available_for_base]
+                candidate = f"{base_part}{num}"
+
+                if candidate not in used_names:
+                    return candidate
+
+        # Fallback: use a very short name with number if nothing else works
+        for num in range(1, 1000):
+            candidate = f"CH{num}"
+            if candidate not in used_names and len(candidate) <= max_length:
+                return candidate
+
+        # Should never reach here, but provide a final fallback
+        return f"CH{len(used_names)}"
+
+    def _generate_unique_names(
+        self, base_name: str, count: int, max_length: int, iteration: int = 0
+    ) -> List[str]:
+        """Generate unique names for a conflict group.
+
+        Strategy:
+        1. If base_name has format 'CALLSIGN-LOCATION', shorten LOCATION
+        2. Add numbers (1, 2, 3, ...) to make unique
+        3. Ensure total length stays within max_length
+
+        Args:
+            base_name: The conflicting name
+            count: Number of unique names needed
+            max_length: Maximum length constraint
+
+        Returns:
+            List of unique names
+        """
+        if "-" in base_name:
+            # Split callsign and location parts
+            callsign, location = base_name.split("-", 1)
+
+            # Calculate space needed for numbers
+            # For up to 9 conflicts: "1", "2", etc. (1 char)
+            # For 10-99 conflicts: "10", "11", etc. (2 chars)
+            max_num_digits = len(str(count))
+
+            # Reserve space for separator and number
+            available_for_location = max_length - len(callsign) - 1 - max_num_digits
+
+            # Ensure we have at least 1 character for location
+            if available_for_location < 1:
+                available_for_location = 1
+
+            # Shorten location to make room for numbers
+            shortened_location = location[:available_for_location]
+
+            # Generate numbered variants
+            unique_names = []
+            for i in range(1, count + 1):
+                name = f"{callsign}-{shortened_location}{i}"
+                unique_names.append(name[:max_length])
+
+            return unique_names
+        else:
+            # For names without "-", just add numbers
+            max_num_digits = len(str(count))
+            base_part = base_name[: max_length - max_num_digits]
+
+            unique_names = []
+            for i in range(1, count + 1):
+                name = f"{base_part}{i}"
+                unique_names.append(name[:max_length])
+
+            return unique_names
