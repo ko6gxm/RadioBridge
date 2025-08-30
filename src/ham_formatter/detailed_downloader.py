@@ -616,8 +616,8 @@ class DetailedRepeaterDownloader(RepeaterBookDownloader):
         if color_code_match:
             detail_data["dmr_color_code"] = color_code_match.group(1)
 
-        # Extract DMR ID
-        dmr_id_match = re.search(r"DMR.*?ID:\s*(\d+)", text)
+        # Extract DMR ID (be specific to avoid matching "Repeater ID")
+        dmr_id_match = re.search(r"DMR\s+ID:\s*(\d+)", text)
         if dmr_id_match:
             detail_data["dmr_id"] = dmr_id_match.group(1)
 
