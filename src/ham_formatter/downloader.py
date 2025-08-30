@@ -415,6 +415,67 @@ class RepeaterBookDownloader:
                 df[col] = df[col].str.strip()
                 df[col] = df[col].replace("", pd.NA)
 
+        # Handle special case: "Tone Up / Down" column contains two tone values
+        tone_up_down_cols = [
+            col
+            for col in df.columns
+            if "tone" in str(col).lower()
+            and (
+                "up" in str(col).lower()
+                or "down" in str(col).lower()
+                or "/" in str(col)
+            )
+        ]
+        if tone_up_down_cols:
+            tone_col = tone_up_down_cols[0]
+            self.logger.debug(
+                f"Found combined tone column: '{tone_col}', "
+                "splitting into separate columns"
+            )
+
+            # Split the tone column into tone_up and tone_down
+            tone_up_values = []
+            tone_down_values = []
+
+            for value in df[tone_col]:
+                if pd.isna(value) or str(value).strip() in ["", "nan", "None"]:
+                    tone_up_values.append(None)
+                    tone_down_values.append(None)
+                else:
+                    # Convert to string and clean up
+                    value_str = str(value).strip()
+
+                    # Split on common delimiters (space, slash, comma, etc.)
+                    # Look for patterns like "123.0 / 456.0" or "123.0 456.0"
+                    if "/" in value_str:
+                        parts = value_str.split("/", 1)
+                    elif " " in value_str and len(value_str.split()) >= 2:
+                        # Handle space-separated values, but be careful with
+                        # single values that have spaces
+                        parts = value_str.split(
+                            None, 1
+                        )  # Split on any whitespace, max 2 parts
+                    else:
+                        # Single value - treat as tone_up, leave tone_down empty
+                        parts = [value_str, ""]
+
+                    # Clean and extract the tone values
+                    tone_up = parts[0].strip() if len(parts) > 0 else ""
+                    tone_down = parts[1].strip() if len(parts) > 1 else ""
+
+                    # Convert empty strings to None
+                    tone_up_values.append(tone_up if tone_up else None)
+                    tone_down_values.append(tone_down if tone_down else None)
+
+            # Add the new columns and remove the original
+            df["tone_up"] = tone_up_values
+            df["tone_down"] = tone_down_values
+            df = df.drop(columns=[tone_col])
+
+            self.logger.debug(
+                f"Split '{tone_col}' into 'tone_up' and 'tone_down' columns"
+            )
+
         # Try to standardize common column names
         column_mapping = {
             "Frequency": "frequency",

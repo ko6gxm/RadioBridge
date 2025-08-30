@@ -391,3 +391,75 @@ class TestEchoLinkFunctionality:
             assert result["echolink_node"] == expected_node
             assert "echolink_status_text" in result
             assert expected_status in result["echolink_status_text"]
+
+    @patch("requests.Session.get")
+    def test_scrape_detail_page_with_echolink_integration(self, mock_get):
+        """Test integration of EchoLink extraction within _scrape_detail_page method."""
+        downloader = DetailedRepeaterDownloader(debug=True)
+
+        # Mock the main detail page response
+        detail_response = Mock()
+        detail_response.raise_for_status.return_value = None
+        detail_response.content = b"""
+        <html><body>
+        <h1>Repeater Details</h1>
+        <p>Repeater ID: RB12345</p>
+        <p>Frequency: 145.200 MHz</p>
+        <p>EchoLink: 67890 (Online)</p>
+        <a href="https://www.echolink.org/logins.jsp?call=67890">EchoLink Status</a>
+        <p>Location: Test City, CA</p>
+        <p>Sponsor: Test Radio Club</p>
+        </body></html>
+        """
+
+        # Mock the EchoLink status page response
+        echolink_response = Mock()
+        echolink_response.raise_for_status.return_value = None
+        echolink_response.content = b"""
+        <html><body>
+        <h1>K6TEST-R Node 67890</h1>
+        <p>Status: Online</p>
+        <p>Location: Test City, CA</p>
+        <p>Last Activity: 2024-01-15 14:30:00</p>
+        </body></html>
+        """
+
+        # Configure mock to return appropriate responses
+        def mock_get_side_effect(url, timeout=None):
+            if "details.php" in url:
+                return detail_response
+            elif "echolink.org" in url:
+                return echolink_response
+            else:
+                raise ValueError(f"Unexpected URL: {url}")
+
+        mock_get.side_effect = mock_get_side_effect
+
+        # Test the integration
+        result = downloader._scrape_detail_page(
+            "https://www.repeaterbook.com/repeaters/details.php?state_id=06&ID=12345"
+        )
+
+        # Verify basic detail data was extracted
+        assert "repeater_id" in result
+        assert result["repeater_id"] == "RB12345"
+
+        # Verify EchoLink data was extracted and merged
+        assert "echolink_node" in result
+        assert result["echolink_node"] == "67890"
+        assert "echolink_status_text" in result
+        assert "Online" in result["echolink_status_text"]
+        assert "echolink_url" in result
+        assert "echolink.org" in result["echolink_url"]
+
+        # Verify EchoLink status data was fetched and merged
+        assert "echolink_node_status" in result
+        assert result["echolink_node_status"] == "Online"
+        assert "echolink_callsign" in result
+        assert "K6TEST" in result["echolink_callsign"]
+        assert "echolink_location" in result
+        assert "Test City" in result["echolink_location"]
+        assert "echolink_last_activity" in result
+
+        # Verify both requests were made
+        assert mock_get.call_count == 2

@@ -237,3 +237,121 @@ class TestBaofengDM32UVFormatter:
         assert result.iloc[1]["TX Frequency[MHz]"] == "146.40000"  # 147.0 - 0.6
         assert result.iloc[1]["CTC/DCS Decode"] == "146.2"
         assert result.iloc[1]["CTC/DCS Encode"] == "146.2"
+
+
+class TestToneUpDownFunctionality:
+    """Test tone_up and tone_down support across all radio formatters."""
+
+    def test_dm32uv_supports_separate_tones(self):
+        """Test DM-32UV formatter with separate tone_up and tone_down."""
+        from ham_formatter.radios.baofeng_dm32uv import BaofengDM32UVFormatter
+
+        formatter = BaofengDM32UVFormatter()
+
+        # Test data with separate tones
+        test_data = pd.DataFrame(
+            {
+                "frequency": ["146.520", "147.000"],
+                "tone_up": ["123.0", None],
+                "tone_down": ["456.0", "88.5"],
+                "callsign": ["W1ABC", "K2DEF"],
+                "location": ["City1", "City2"],
+            }
+        )
+
+        result = formatter.format(test_data)
+
+        # Check tone mapping: tone_up -> encode, tone_down -> decode
+        assert result.iloc[0]["CTC/DCS Encode"] == "123.0"
+        assert result.iloc[0]["CTC/DCS Decode"] == "456.0"
+        assert result.iloc[1]["CTC/DCS Encode"] == "None"  # None tone_up
+        assert result.iloc[1]["CTC/DCS Decode"] == "88.5"
+
+    def test_anytone_878_supports_separate_tones(self):
+        """Test Anytone 878 formatter with separate tone_up and tone_down."""
+        formatter = Anytone878Formatter()
+
+        test_data = pd.DataFrame(
+            {
+                "frequency": ["146.520"],
+                "tone_up": ["123.0"],
+                "tone_down": ["456.0"],
+                "callsign": ["W1ABC"],
+            }
+        )
+
+        result = formatter.format(test_data)
+
+        assert result.iloc[0]["CTCSS/DCS Encode"] == "123.0"
+        assert result.iloc[0]["CTCSS/DCS Decode"] == "456.0"
+
+    def test_anytone_578_supports_separate_tones(self):
+        """Test Anytone 578 formatter with separate tone_up and tone_down."""
+        from ham_formatter.radios.anytone_578 import Anytone578Formatter
+
+        formatter = Anytone578Formatter()
+
+        test_data = pd.DataFrame(
+            {
+                "frequency": ["146.520"],
+                "tone_up": ["123.0"],
+                "tone_down": ["456.0"],
+                "callsign": ["W1ABC"],
+            }
+        )
+
+        result = formatter.format(test_data)
+
+        assert result.iloc[0]["CTCSS/DCS Encode"] == "123.0"
+        assert result.iloc[0]["CTCSS/DCS Decode"] == "456.0"
+
+    def test_baofeng_k5_supports_separate_tones(self):
+        """Test Baofeng K5 formatter with separate tone_up and tone_down."""
+        from ham_formatter.radios.baofeng_k5 import BaofengK5Formatter
+
+        formatter = BaofengK5Formatter()
+
+        test_data = pd.DataFrame(
+            {
+                "frequency": ["146.520"],
+                "tone_up": ["123.0"],
+                "tone_down": ["456.0"],
+                "callsign": ["W1ABC"],
+            }
+        )
+
+        result = formatter.format(test_data)
+
+        assert result.iloc[0]["TX CTCSS/DCS"] == "123.0"
+        assert result.iloc[0]["RX CTCSS/DCS"] == "456.0"
+
+    def test_legacy_tone_column_fallback(self):
+        """Test that formatters fall back to legacy 'tone' column.
+
+        When tone_up/down don't exist, should use legacy tone column.
+        """
+        formatter = Anytone878Formatter()
+
+        # Test data with only legacy tone column
+        test_data = pd.DataFrame(
+            {"frequency": ["146.520"], "tone": ["100.0"], "callsign": ["W1ABC"]}
+        )
+
+        result = formatter.format(test_data)
+
+        # Should use same tone for both encode and decode
+        assert result.iloc[0]["CTCSS/DCS Encode"] == "100.0"
+        assert result.iloc[0]["CTCSS/DCS Decode"] == "100.0"
+
+    def test_no_tone_columns_results_in_off(self):
+        """Test that missing tone data results in 'Off' values."""
+        formatter = Anytone878Formatter()
+
+        # Test data with no tone columns
+        test_data = pd.DataFrame({"frequency": ["146.520"], "callsign": ["W1ABC"]})
+
+        result = formatter.format(test_data)
+
+        # Should default to 'Off'
+        assert result.iloc[0]["CTCSS/DCS Encode"] == "Off"
+        assert result.iloc[0]["CTCSS/DCS Decode"] == "Off"

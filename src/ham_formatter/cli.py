@@ -303,9 +303,20 @@ def download(
     type=click.Path(path_type=Path),
     help="Output file path (default: formatted_<radio>_<input_name>.csv)",
 )
+@click.option(
+    "--start-channel",
+    "-s",
+    type=int,
+    default=1,
+    help="Starting channel number for the output (default: 1)",
+)
 @click.pass_context
 def format(
-    ctx: click.Context, input_file: Path, radio: str, output: Optional[Path]
+    ctx: click.Context,
+    input_file: Path,
+    radio: str,
+    output: Optional[Path],
+    start_channel: int,
 ) -> None:
     """Format repeater data for a specific radio model."""
     logger = get_logger(__name__)
@@ -325,8 +336,11 @@ def format(
             )
             sys.exit(1)
 
-        # Format the data
-        formatted_data = formatter.format(data)
+        # Format the data with start channel
+        formatted_data = formatter.format(data, start_channel=start_channel)
+
+        if start_channel != 1:
+            logger.info(f"Using custom start channel: {start_channel}")
 
         # Determine output path
         if output is None:

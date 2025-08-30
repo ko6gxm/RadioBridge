@@ -69,11 +69,12 @@ class Anytone878Formatter(BaseRadioFormatter):
             "GPS System",
         ]
 
-    def format(self, data: pd.DataFrame) -> pd.DataFrame:
+    def format(self, data: pd.DataFrame, start_channel: int = 1) -> pd.DataFrame:
         """Format repeater data for Anytone 878.
 
         Args:
             data: Input DataFrame with repeater information
+            start_channel: Starting channel number (default: 1)
 
         Returns:
             Formatted DataFrame ready for Anytone CPS import
@@ -90,7 +91,7 @@ class Anytone878Formatter(BaseRadioFormatter):
         formatted_data = []
 
         for idx, row in data.iterrows():
-            channel_num = idx + 1
+            channel_num = idx + start_channel
 
             # Extract and clean data
             rx_freq = self.clean_frequency(row.get("frequency"))
@@ -112,8 +113,9 @@ class Anytone878Formatter(BaseRadioFormatter):
             else:
                 tx_freq = rx_freq  # Simplex
 
-            # Get tone information
-            tone = self.clean_tone(row.get("tone"))
+            # Get tone information (supports both new tone_up/tone_down and
+            # legacy tone columns)
+            tone_up, tone_down = self.get_tone_values(row)
 
             # Generate channel name
             location = row.get("location", row.get("city", row.get("callsign", "")))
@@ -148,8 +150,8 @@ class Anytone878Formatter(BaseRadioFormatter):
                 "Channel Type": channel_type,
                 "Power": "High",  # Default to high power
                 "Band Width": "25K",  # Default to 25kHz bandwidth
-                "CTCSS/DCS Decode": tone if tone else "Off",
-                "CTCSS/DCS Encode": tone if tone else "Off",
+                "CTCSS/DCS Decode": tone_down if tone_down else "Off",
+                "CTCSS/DCS Encode": tone_up if tone_up else "Off",
                 "Contact": "None",
                 "Contact Call Type": "Group Call",
                 "Radio ID": "None",

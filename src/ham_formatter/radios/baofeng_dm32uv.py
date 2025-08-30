@@ -85,11 +85,12 @@ class BaofengDM32UVFormatter(BaseRadioFormatter):
             "PTT ID Display",
         ]
 
-    def format(self, data: pd.DataFrame) -> pd.DataFrame:
+    def format(self, data: pd.DataFrame, start_channel: int = 1) -> pd.DataFrame:
         """Format repeater data for Baofeng DM-32UV.
 
         Args:
             data: Input DataFrame with repeater information
+            start_channel: Starting channel number (default: 1)
 
         Returns:
             Formatted DataFrame ready for DM-32UV programming software
@@ -102,7 +103,7 @@ class BaofengDM32UVFormatter(BaseRadioFormatter):
         formatted_data = []
 
         for idx, row in data.iterrows():
-            channel = idx + 1
+            channel = idx + start_channel
 
             rx_freq = self.clean_frequency(row.get("frequency"))
             if not rx_freq:
@@ -123,8 +124,9 @@ class BaofengDM32UVFormatter(BaseRadioFormatter):
             else:
                 tx_freq = rx_freq
 
-            # Get tone information
-            tone = self.clean_tone(row.get("tone"))
+            # Get tone information (supports both new tone_up/tone_down and
+            # legacy tone columns)
+            tone_up, tone_down = self.get_tone_values(row)
 
             # Generate channel name
             location = row.get("location", row.get("city", ""))
@@ -132,7 +134,7 @@ class BaofengDM32UVFormatter(BaseRadioFormatter):
 
             if location and callsign:
                 # Keep it short for DM-32UV display
-                channel_name = f"{location[:8]}-{callsign}"
+                channel_name = f"{callsign}-{location[:8]}"
             elif location:
                 channel_name = str(location)[:16]
             elif callsign:
@@ -165,12 +167,9 @@ class BaofengDM32UVFormatter(BaseRadioFormatter):
             power = "High"  # Default to High (5W), could be "Low" (1W)
 
             # Format tone values for CTC/DCS fields
-            if tone:
-                ctc_decode = tone
-                ctc_encode = tone
-            else:
-                ctc_decode = "None"
-                ctc_encode = "None"
+            # Use tone_down for decode (receive) and tone_up for encode (transmit)
+            ctc_decode = tone_down if tone_down else "None"
+            ctc_encode = tone_up if tone_up else "None"
 
             formatted_row = {
                 "No.": channel,

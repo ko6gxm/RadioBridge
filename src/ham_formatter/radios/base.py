@@ -1,7 +1,7 @@
 """Base class for radio formatters."""
 
 from abc import ABC, abstractmethod
-from typing import Any, List, Optional
+from typing import Any, List, Optional, Tuple
 
 import pandas as pd
 
@@ -45,11 +45,12 @@ class BaseRadioFormatter(ABC):
         pass
 
     @abstractmethod
-    def format(self, data: pd.DataFrame) -> pd.DataFrame:
+    def format(self, data: pd.DataFrame, start_channel: int = 1) -> pd.DataFrame:
         """Format repeater data for this radio.
 
         Args:
             data: Input DataFrame with repeater information
+            start_channel: Starting channel number (default: 1)
 
         Returns:
             Formatted DataFrame ready for radio programming software
@@ -149,6 +150,42 @@ class BaseRadioFormatter(ABC):
             pass
 
         return tone_str  # Return as-is if it's not numeric but not empty
+
+    def get_tone_values(
+        self, row: pd.Series, fallback_tone_column: str = "tone"
+    ) -> Tuple[Optional[str], Optional[str]]:
+        """Get tone_up and tone_down values from row data.
+
+        This method first tries to get values from separate tone_up/tone_down columns.
+        If those don't exist, it falls back to a single tone column for both values.
+
+        Args:
+            row: Pandas Series representing a row of repeater data
+            fallback_tone_column: Column name to use if tone_up/tone_down don't exist
+
+        Returns:
+            Tuple of (tone_up, tone_down) as cleaned strings or None
+        """
+        # First, try to get separate tone values
+        tone_up = None
+        tone_down = None
+
+        if "tone_up" in row:
+            tone_up = self.clean_tone(row.get("tone_up"))
+        if "tone_down" in row:
+            tone_down = self.clean_tone(row.get("tone_down"))
+
+        # If we have separate values, use them
+        if tone_up is not None or tone_down is not None:
+            return (tone_up, tone_down)
+
+        # Fall back to single tone column for both values
+        if fallback_tone_column in row:
+            tone_value = self.clean_tone(row.get(fallback_tone_column))
+            return (tone_value, tone_value)
+
+        # No tone information available
+        return (None, None)
 
     def clean_offset(self, offset: Any) -> Optional[str]:
         """Clean and format offset data.

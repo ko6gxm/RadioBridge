@@ -57,11 +57,12 @@ class BaofengK5Formatter(BaseRadioFormatter):
             "RX Only",
         ]
 
-    def format(self, data: pd.DataFrame) -> pd.DataFrame:
+    def format(self, data: pd.DataFrame, start_channel: int = 1) -> pd.DataFrame:
         """Format repeater data for Baofeng K5 Plus.
 
         Args:
             data: Input DataFrame with repeater information
+            start_channel: Starting channel number (default: 1)
 
         Returns:
             Formatted DataFrame ready for K5 Plus programming software
@@ -74,7 +75,7 @@ class BaofengK5Formatter(BaseRadioFormatter):
         formatted_data = []
 
         for idx, row in data.iterrows():
-            channel = idx + 1
+            channel = idx + start_channel
 
             rx_freq = self.clean_frequency(row.get("frequency"))
             if not rx_freq:
@@ -95,8 +96,9 @@ class BaofengK5Formatter(BaseRadioFormatter):
             else:
                 tx_freq = rx_freq
 
-            # Get tone information
-            tone = self.clean_tone(row.get("tone"))
+            # Get tone information (supports both new tone_up/tone_down and
+            # legacy tone columns)
+            tone_up, tone_down = self.get_tone_values(row)
 
             # Generate channel name
             location = row.get("location", row.get("city", ""))
@@ -132,8 +134,8 @@ class BaofengK5Formatter(BaseRadioFormatter):
                 "TX Frequency": tx_freq,
                 "TX Power": tx_power,
                 "Bandwidth": "Wide",  # K5 Plus defaults to wide (25kHz)
-                "RX CTCSS/DCS": tone if tone else "Off",
-                "TX CTCSS/DCS": tone if tone else "Off",
+                "RX CTCSS/DCS": tone_down if tone_down else "Off",
+                "TX CTCSS/DCS": tone_up if tone_up else "Off",
                 "Busy Lock": "Off",
                 "Scrambler": "Off",
                 "Compander": "Off",

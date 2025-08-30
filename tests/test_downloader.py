@@ -256,3 +256,73 @@ class TestConvenienceFunctions:
             "CA", "United States", None
         )
         assert isinstance(result, pd.DataFrame)
+
+    def test_clean_scraped_data_splits_tone_up_down_column(self):
+        """Test that 'Tone Up / Down' column is properly split into separate columns."""
+        downloader = RepeaterBookDownloader()
+
+        # Test data with various tone formats
+        test_data = pd.DataFrame(
+            {
+                "Frequency": ["146.520", "147.000", "440.125", "146.640", "147.180"],
+                "Tone Up / Down": [
+                    "123.0 / 456.0",  # Slash with spaces
+                    "67.0 88.5",  # Space separated
+                    "100.0/200.0",  # Slash without spaces
+                    "150.0",  # Single value
+                    "",  # Empty
+                ],
+                "Call Sign": ["W1ABC", "K2DEF", "N3GHI", "K4JKL", "W5MNO"],
+            }
+        )
+
+        result = downloader._clean_scraped_data(test_data)
+
+        # Verify the tone columns were split correctly
+        assert "tone_up" in result.columns
+        assert "tone_down" in result.columns
+        assert (
+            "Tone Up / Down" not in result.columns
+        )  # Original column should be removed
+
+        # Check specific values
+        assert result.iloc[0]["tone_up"] == "123.0"
+        assert result.iloc[0]["tone_down"] == "456.0"
+
+        assert result.iloc[1]["tone_up"] == "67.0"
+        assert result.iloc[1]["tone_down"] == "88.5"
+
+        assert result.iloc[2]["tone_up"] == "100.0"
+        assert result.iloc[2]["tone_down"] == "200.0"
+
+        assert result.iloc[3]["tone_up"] == "150.0"
+        assert (
+            result.iloc[3]["tone_down"] is None
+        )  # Single value leaves tone_down empty
+
+        assert result.iloc[4]["tone_up"] is None  # Empty string becomes None
+        assert result.iloc[4]["tone_down"] is None
+
+    def test_clean_scraped_data_handles_missing_tone_column(self):
+        """Test that data without 'Tone Up / Down' column is processed normally."""
+        downloader = RepeaterBookDownloader()
+
+        # Test data without tone up/down column
+        test_data = pd.DataFrame(
+            {
+                "Frequency": ["146.520", "147.000"],
+                "Call Sign": ["W1ABC", "K2DEF"],
+                "Location": ["City1", "City2"],
+            }
+        )
+
+        result = downloader._clean_scraped_data(test_data)
+
+        # Should not add tone columns if they weren't in the original data
+        assert "tone_up" not in result.columns
+        assert "tone_down" not in result.columns
+
+        # Other columns should still be processed normally
+        assert "frequency" in result.columns
+        assert "callsign" in result.columns
+        assert "location" in result.columns
