@@ -172,3 +172,68 @@ class TestBaseFormatter:
         assert formatter.clean_offset("") is None
         assert formatter.clean_offset(None) is None
         assert formatter.clean_offset(pd.NA) is None
+
+
+class TestBaofengDM32UVFormatter:
+    """Test the Baofeng DM-32UV formatter specifically."""
+
+    def test_formatter_properties(self):
+        """Test formatter properties are correctly set."""
+        from ham_formatter.radios.baofeng_dm32uv import BaofengDM32UVFormatter
+
+        formatter = BaofengDM32UVFormatter()
+
+        assert formatter.radio_name == "Baofeng DM-32UV"
+        assert "DMR" in formatter.description
+        assert formatter.manufacturer == "Baofeng"
+        assert "frequency" in formatter.required_columns
+        assert len(formatter.output_columns) == 40  # DM-32UV has 40 columns
+        assert "No." in formatter.output_columns
+        assert "RX Frequency[MHz]" in formatter.output_columns
+        assert "TX Frequency[MHz]" in formatter.output_columns
+
+    def test_format_basic_data(self):
+        """Test formatting basic repeater data for DM-32UV."""
+        from ham_formatter.radios.baofeng_dm32uv import BaofengDM32UVFormatter
+
+        formatter = BaofengDM32UVFormatter()
+
+        # Sample input data
+        input_data = pd.DataFrame(
+            {
+                "frequency": ["146.520000", "147.000000"],
+                "offset": ["+0.000000", "-0.600000"],
+                "tone": ["", "146.2"],
+                "location": ["Los Angeles", "San Francisco"],
+                "call": ["W6ABC", "K6XYZ"],
+            }
+        )
+
+        result = formatter.format(input_data)
+
+        # Check basic structure
+        assert len(result) == 2
+        assert len(result.columns) == 40  # DM-32UV specific column count
+        assert "No." in result.columns
+        assert "RX Frequency[MHz]" in result.columns
+        assert "TX Frequency[MHz]" in result.columns
+        assert "Channel Type" in result.columns
+
+        # Check first row
+        assert result.iloc[0]["No."] == 1
+        assert result.iloc[0]["RX Frequency[MHz]"] == "146.520000"
+        assert (
+            result.iloc[0]["TX Frequency[MHz]"] == "146.52000"
+        )  # Same freq (no offset)
+        assert result.iloc[0]["Channel Type"] == "Analog"
+        assert (
+            "W6ABC" in result.iloc[0]["Channel Name"]
+            or "Los Ange" in result.iloc[0]["Channel Name"]
+        )
+
+        # Check second row with offset
+        assert result.iloc[1]["No."] == 2
+        assert result.iloc[1]["RX Frequency[MHz]"] == "147.000000"
+        assert result.iloc[1]["TX Frequency[MHz]"] == "146.40000"  # 147.0 - 0.6
+        assert result.iloc[1]["CTC/DCS Decode"] == "146.2"
+        assert result.iloc[1]["CTC/DCS Encode"] == "146.2"

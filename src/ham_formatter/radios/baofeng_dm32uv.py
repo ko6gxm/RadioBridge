@@ -43,24 +43,46 @@ class BaofengDM32UVFormatter(BaseRadioFormatter):
     def output_columns(self) -> List[str]:
         """List of column names in the formatted output."""
         return [
-            "Channel",
+            "No.",
             "Channel Name",
-            "RX Frequency",
-            "TX Frequency",
             "Channel Type",
-            "TX Power",
-            "Bandwidth",
-            "RX CTCSS/DCS",
-            "TX CTCSS/DCS",
-            "Contact",
-            "Contact Call Type",
-            "Radio ID",
-            "Busy Lock/TX Permit",
-            "Squelch Mode",
+            "RX Frequency[MHz]",
+            "TX Frequency[MHz]",
+            "Power",
+            "Band Width",
+            "Scan List",
+            "TX Admit",
+            "Emergency System",
+            "Squelch Level",
+            "APRS Report Type",
+            "Forbid TX",
+            "APRS Receive",
+            "Forbid Talkaround",
+            "Auto Scan",
+            "Lone Work",
+            "Emergency Indicator",
+            "Emergency ACK",
+            "Analog APRS PTT Mode",
+            "Digital APRS PTT Mode",
+            "TX Contact",
+            "RX Group List",
             "Color Code",
             "Time Slot",
-            "Scan List",
-            "Group List",
+            "Encryption",
+            "Encryption ID",
+            "APRS Report Channel",
+            "Direct Dual Mode",
+            "Private Confirm",
+            "Short Data Confirm",
+            "DMR ID",
+            "CTC/DCS Decode",
+            "CTC/DCS Encode",
+            "Scramble",
+            "RX Squelch Mode",
+            "Signaling Type",
+            "PTT ID",
+            "VOX Function",
+            "PTT ID Display",
         ]
 
     def format(self, data: pd.DataFrame) -> pd.DataFrame:
@@ -95,7 +117,7 @@ class BaofengDM32UVFormatter(BaseRadioFormatter):
                 try:
                     rx_float = float(rx_freq)
                     offset_float = float(offset)
-                    tx_freq = f"{rx_float + offset_float:.6f}"
+                    tx_freq = f"{rx_float + offset_float:.5f}"
                 except (ValueError, TypeError):
                     tx_freq = rx_freq
             else:
@@ -106,51 +128,91 @@ class BaofengDM32UVFormatter(BaseRadioFormatter):
 
             # Generate channel name
             location = row.get("location", row.get("city", ""))
-            callsign = row.get("callsign", "")
+            callsign = row.get("callsign", row.get("call", ""))
 
             if location and callsign:
-                channel_name = (
-                    f"{location[:8]} {callsign}"  # DM-32UV has limited display
-                )
+                # Keep it short for DM-32UV display
+                channel_name = f"{location[:8]}-{callsign}"
             elif location:
                 channel_name = str(location)[:16]
             elif callsign:
-                channel_name = str(callsign)
+                channel_name = str(callsign)[:16]
             else:
                 channel_name = f"CH{channel:03d}"
 
-            # Limit name for DM-32UV display
+            # Limit name for DM-32UV display (16 chars max)
             channel_name = channel_name[:16]
 
-            # Determine channel type - DM-32UV supports both analog and digital
-            # Default to analog for repeater data, but could be enhanced to detect DMR
-            rx_float = float(rx_freq)
-            if 136.0 <= rx_float <= 174.0:  # VHF
-                channel_type = "A-Analog"  # Could also be "D-Digital" for DMR
-            elif 400.0 <= rx_float <= 520.0:  # UHF
-                channel_type = "A-Analog"  # Could also be "D-Digital" for DMR
+            # Determine if this is a digital repeater (DMR)
+            # Check for DMR indicators in the data
+            is_dmr = False
+            for field in ["mode", "type", "service"]:
+                field_value = str(row.get(field, "")).lower()
+                if any(
+                    keyword in field_value
+                    for keyword in ["dmr", "digital", "d-star", "fusion"]
+                ):
+                    is_dmr = True
+                    break
+
+            # Set channel type
+            channel_type = "Digital" if is_dmr else "Analog"
+
+            # Set bandwidth based on mode
+            bandwidth = "12.5KHz" if is_dmr else "25KHz"
+
+            # Set power level
+            power = "High"  # Default to High (5W), could be "Low" (1W)
+
+            # Format tone values for CTC/DCS fields
+            if tone:
+                ctc_decode = tone
+                ctc_encode = tone
             else:
-                channel_type = "A-Analog"
+                ctc_decode = "None"
+                ctc_encode = "None"
 
             formatted_row = {
-                "Channel": channel,
+                "No.": channel,
                 "Channel Name": channel_name,
-                "RX Frequency": rx_freq,
-                "TX Frequency": tx_freq,
                 "Channel Type": channel_type,
-                "TX Power": "High",  # DM-32UV: High (5W) or Low (1W)
-                "Bandwidth": "25K",  # 25kHz for analog, 12.5kHz also supported
-                "RX CTCSS/DCS": tone if tone else "Off",
-                "TX CTCSS/DCS": tone if tone else "Off",
-                "Contact": "None",  # For DMR contacts
-                "Contact Call Type": "Group Call",
-                "Radio ID": "None",  # DMR radio ID
-                "Busy Lock/TX Permit": "Always",
-                "Squelch Mode": "Carrier",
-                "Color Code": "1",  # DMR color code (0-15)
-                "Time Slot": "1",  # DMR time slot (1 or 2)
+                "RX Frequency[MHz]": rx_freq,
+                "TX Frequency[MHz]": tx_freq,
+                "Power": power,
+                "Band Width": bandwidth,
                 "Scan List": "None",
-                "Group List": "None",  # DMR group list
+                "TX Admit": "Allow TX",
+                "Emergency System": "None",
+                "Squelch Level": "3",
+                "APRS Report Type": "Off",
+                "Forbid TX": "0",
+                "APRS Receive": "0",
+                "Forbid Talkaround": "0",
+                "Auto Scan": "0",
+                "Lone Work": "0",
+                "Emergency Indicator": "0",
+                "Emergency ACK": "0",
+                "Analog APRS PTT Mode": "0",
+                "Digital APRS PTT Mode": "0",
+                "TX Contact": "None" if not is_dmr else "None",
+                "RX Group List": "None" if not is_dmr else "None",
+                "Color Code": "1" if is_dmr else "0",
+                "Time Slot": "Slot 1" if is_dmr else "Slot 1",
+                "Encryption": "0",
+                "Encryption ID": "None",
+                "APRS Report Channel": "1",
+                "Direct Dual Mode": "0",
+                "Private Confirm": "0",
+                "Short Data Confirm": "0",
+                "DMR ID": callsign if callsign else "None",
+                "CTC/DCS Decode": ctc_decode,
+                "CTC/DCS Encode": ctc_encode,
+                "Scramble": "None",
+                "RX Squelch Mode": "Carrier/CTC",
+                "Signaling Type": "None",
+                "PTT ID": "OFF",
+                "VOX Function": "0",
+                "PTT ID Display": "0",
             }
 
             formatted_data.append(formatted_row)
