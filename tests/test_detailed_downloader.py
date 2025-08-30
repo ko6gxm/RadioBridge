@@ -163,13 +163,13 @@ class TestDetailedRepeaterDownloader:
         assert links[1]["callsign"] == "K6XYZ"
 
     def test_merge_data(self):
-        """Test merging basic and detailed data."""
+        """Test merging basic and detailed data into structured format."""
         basic_data = pd.DataFrame(
             {"frequency": [145.200, 146.940], "call": ["W6ABC", "K6XYZ"]}
         )
 
         detailed_data = {
-            0: {"sponsor": "Club A", "grid_square": "DM13"},
+            0: {"sponsor": "Club A", "grid_squares": ["DM13"]},
             1: {"sponsor": "Club B", "note": "Test note"},
         }
 
@@ -177,25 +177,34 @@ class TestDetailedRepeaterDownloader:
         result = downloader._merge_data(basic_data, detailed_data)
 
         assert len(result) == 2
-        assert "detail_sponsor" in result.columns
-        assert "detail_grid_square" in result.columns
-        assert "detail_note" in result.columns
 
-        # Check row 0
-        assert result.loc[0, "detail_sponsor"] == "Club A"
-        assert result.loc[0, "detail_grid_square"] == "DM13"
-        assert (
-            pd.isna(result.loc[0, "detail_note"])
-            or result.loc[0, "detail_note"] is None
-        )
+        # Check that we have the structured columns
+        expected_columns = [
+            "Downlink",
+            "Uplink",
+            "Offset",
+            "Uplink Tone",
+            "Downlink Tone",
+            "DMR",
+            "Color Code",
+            "DMR ID",
+            "Call",
+            "Sponsor",
+            "Grid Square",
+            "Notes",
+        ]
+        for col in expected_columns:
+            assert col in result.columns, f"Missing column: {col}"
 
-        # Check row 1
-        assert result.loc[1, "detail_sponsor"] == "Club B"
-        assert (
-            pd.isna(result.loc[1, "detail_grid_square"])
-            or result.loc[1, "detail_grid_square"] is None
-        )
-        assert result.loc[1, "detail_note"] == "Test note"
+        # Check specific values
+        assert result.loc[0, "Call"] == "W6ABC"
+        assert result.loc[0, "Sponsor"] == "Club A"
+        assert result.loc[0, "Grid Square"] == "DM13"
+        assert result.loc[1, "Call"] == "K6XYZ"
+        assert result.loc[1, "Sponsor"] == "Club B"
+
+        # Check that the note appears in the Notes field
+        assert "Note: Test note" in result.loc[1, "Notes"]
 
 
 class TestDetailedDownloaderFunctions:

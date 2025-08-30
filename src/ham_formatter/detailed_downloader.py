@@ -386,34 +386,22 @@ class DetailedRepeaterDownloader(RepeaterBookDownloader):
     def _merge_data(
         self, basic_data: pd.DataFrame, detailed_data: Dict[int, Dict[str, Any]]
     ) -> pd.DataFrame:
-        """Merge basic and detailed data into enhanced dataset.
+        """Merge basic and detailed data into structured format.
 
         Args:
             basic_data: DataFrame with basic repeater information
             detailed_data: Dictionary mapping row indices to detailed data
 
         Returns:
-            Enhanced DataFrame with merged data
+            Structured DataFrame with specific columns and consolidated notes
         """
-        enhanced_data = basic_data.copy()
+        # Create structured output with specific columns
+        structured_data = self._create_structured_output(basic_data, detailed_data)
 
-        # Add columns for detailed data fields
-        detail_columns = set()
-        for row_data in detailed_data.values():
-            detail_columns.update(row_data.keys())
-
-        # Initialize new columns
-        for col in detail_columns:
-            enhanced_data[f"detail_{col}"] = None
-
-        # Merge detailed data
-        for row_index, row_detail in detailed_data.items():
-            if row_index < len(enhanced_data):
-                for key, value in row_detail.items():
-                    enhanced_data.loc[row_index, f"detail_{key}"] = str(value)
-
-        self.logger.info(f"Added {len(detail_columns)} detailed data columns")
-        return enhanced_data
+        self.logger.info(
+            f"Created structured dataset with {len(structured_data.columns)} columns"
+        )
+        return structured_data
 
     def _apply_rate_limit(self):
         """Apply rate limiting to avoid overloading the server."""
@@ -662,6 +650,274 @@ class DetailedRepeaterDownloader(RepeaterBookDownloader):
                 detail_data["ts1_talkgroups"] = ",".join(ts1_groups)
             if ts2_groups:
                 detail_data["ts2_talkgroups"] = ",".join(ts2_groups)
+
+    def _create_structured_output(
+        self, basic_data: pd.DataFrame, detailed_data: Dict[int, Dict[str, Any]]
+    ) -> pd.DataFrame:
+        """Create structured output with specific columns and consolidated notes.
+
+        Args:
+            basic_data: DataFrame with basic repeater information
+            detailed_data: Dictionary mapping row indices to detailed data
+
+        Returns:
+            Structured DataFrame with specific columns and notes
+        """
+        # Define the specific columns we want in the output
+        target_columns = [
+            "Downlink",
+            "Uplink",
+            "Offset",
+            "Uplink Tone",
+            "Downlink Tone",
+            "DMR",
+            "Color Code",
+            "DMR ID",
+            "SYSTEM FUSION",
+            "DG‑ID",
+            "WIRES‑X",
+            "County",
+            "Grid Square",
+            "Call",
+            "Use",
+            "Status",
+            "Sponsor",
+            "Affiliate",
+            "FM",
+            "EchoLink",
+            "Coordination",
+            "Updated",
+            "Reviewed",
+            "EchoLink Node",
+            "EchoLink Status",
+            "EchoLink Callsign",
+            "EchoLink Location",
+            "EchoLink Last Activity",
+            "Notes",
+        ]
+
+        # Initialize structured DataFrame
+        structured_df = pd.DataFrame(index=basic_data.index, columns=target_columns)
+
+        # Process each row
+        for idx in basic_data.index:
+            row_detail = detailed_data.get(idx, {})
+
+            # Extract and map specific fields
+            structured_df.loc[idx, "Downlink"] = row_detail.get("downlink_freq", "")
+            structured_df.loc[idx, "Uplink"] = row_detail.get("uplink_freq", "")
+            structured_df.loc[idx, "Offset"] = row_detail.get("offset_mhz", "")
+
+            # For tone data, we need to extract from basic data or detailed data
+            structured_df.loc[idx, "Uplink Tone"] = self._get_tone_data(
+                basic_data.iloc[idx], row_detail, "up"
+            )
+            structured_df.loc[idx, "Downlink Tone"] = self._get_tone_data(
+                basic_data.iloc[idx], row_detail, "down"
+            )
+
+            # DMR information
+            structured_df.loc[idx, "DMR"] = row_detail.get("is_dmr", "false")
+            structured_df.loc[idx, "Color Code"] = row_detail.get("dmr_color_code", "")
+            structured_df.loc[idx, "DMR ID"] = row_detail.get("dmr_id", "")
+
+            # System Fusion and WIRES-X (extract from detail data)
+            structured_df.loc[idx, "SYSTEM FUSION"] = self._extract_system_fusion(
+                row_detail
+            )
+            structured_df.loc[idx, "DG‑ID"] = self._extract_dg_id(row_detail)
+            structured_df.loc[idx, "WIRES‑X"] = self._extract_wires_x(row_detail)
+
+            # Basic information (from basic data with detail fallback)
+            structured_df.loc[idx, "County"] = row_detail.get(
+                "county", basic_data.iloc[idx].get("county", "")
+            )
+            structured_df.loc[idx, "Grid Square"] = self._extract_grid_square(
+                row_detail
+            )
+            structured_df.loc[idx, "Call"] = row_detail.get(
+                "call",
+                basic_data.iloc[idx].get(
+                    "call", basic_data.iloc[idx].get("callsign", "")
+                ),
+            )
+            structured_df.loc[idx, "Use"] = row_detail.get(
+                "use", basic_data.iloc[idx].get("use", "")
+            )
+            structured_df.loc[idx, "Status"] = row_detail.get(
+                "status", basic_data.iloc[idx].get("status", "")
+            )
+
+            # Sponsor and coordination info
+            structured_df.loc[idx, "Sponsor"] = row_detail.get("sponsor", "")
+            structured_df.loc[idx, "Affiliate"] = row_detail.get("affiliate", "")
+            structured_df.loc[idx, "Coordination"] = row_detail.get("coordination", "")
+
+            # FM capability
+            structured_df.loc[idx, "FM"] = self._extract_fm_capability(row_detail)
+
+            # Dates
+            structured_df.loc[idx, "Updated"] = row_detail.get("updated", "")
+            structured_df.loc[idx, "Reviewed"] = row_detail.get("reviewed", "")
+
+            # EchoLink information
+            structured_df.loc[idx, "EchoLink"] = row_detail.get("echolink_node", "")
+            structured_df.loc[idx, "EchoLink Node"] = row_detail.get(
+                "echolink_node", ""
+            )
+            structured_df.loc[idx, "EchoLink Status"] = row_detail.get(
+                "echolink_node_status", ""
+            )
+            structured_df.loc[idx, "EchoLink Callsign"] = row_detail.get(
+                "echolink_callsign", ""
+            )
+            structured_df.loc[idx, "EchoLink Location"] = row_detail.get(
+                "echolink_location", ""
+            )
+            structured_df.loc[idx, "EchoLink Last Activity"] = row_detail.get(
+                "echolink_last_activity", ""
+            )
+
+            # Consolidate remaining data into notes
+            structured_df.loc[idx, "Notes"] = self._create_notes_field(
+                basic_data.iloc[idx], row_detail, target_columns
+            )
+
+        return structured_df
+
+    def _get_tone_data(
+        self, basic_row: pd.Series, detail_data: Dict[str, Any], direction: str
+    ) -> str:
+        """Extract tone data for uplink or downlink."""
+        if direction == "up":
+            # Check detail data first, then basic data
+            tone = detail_data.get(
+                "tone_up", basic_row.get("tone_up", basic_row.get("tone", ""))
+            )
+        else:  # direction == "down"
+            tone = detail_data.get(
+                "tone_down", basic_row.get("tone_down", basic_row.get("tone", ""))
+            )
+
+        return str(tone) if tone else ""
+
+    def _extract_system_fusion(self, detail_data: Dict[str, Any]) -> str:
+        """Extract System Fusion information."""
+        for key, value in detail_data.items():
+            if "fusion" in key.lower() or "system fusion" in str(value).lower():
+                return str(value)
+        return ""
+
+    def _extract_dg_id(self, detail_data: Dict[str, Any]) -> str:
+        """Extract DG-ID information."""
+        for key, value in detail_data.items():
+            if "dg" in key.lower() and "id" in key.lower():
+                return str(value)
+        return ""
+
+    def _extract_wires_x(self, detail_data: Dict[str, Any]) -> str:
+        """Extract WIRES-X information."""
+        for key, value in detail_data.items():
+            if "wires" in key.lower():
+                return str(value)
+        return ""
+
+    def _extract_grid_square(self, detail_data: Dict[str, Any]) -> str:
+        """Extract grid square information."""
+        grid_squares = detail_data.get("grid_squares", [])
+        if grid_squares:
+            return (
+                grid_squares[0] if isinstance(grid_squares, list) else str(grid_squares)
+            )
+
+        # Look for grid square in other fields
+        for key, value in detail_data.items():
+            if "grid" in key.lower():
+                return str(value)
+        return ""
+
+    def _extract_fm_capability(self, detail_data: Dict[str, Any]) -> str:
+        """Extract FM capability information."""
+        fm_value = detail_data.get("fm", "")
+        if fm_value:
+            return str(fm_value)
+
+        # Look for analog capability mentions
+        for key, value in detail_data.items():
+            if "analog" in key.lower() or "fm" in key.lower():
+                return str(value)
+        return ""
+
+    def _create_notes_field(
+        self, basic_row: pd.Series, detail_data: Dict[str, Any], used_columns: List[str]
+    ) -> str:
+        """Create notes field with all remaining data."""
+        notes = []
+
+        # Add talkgroup information for DMR repeaters
+        if detail_data.get("is_dmr") == "true":
+            talkgroups = detail_data.get("talkgroups", "")
+            if talkgroups:
+                notes.append(f"Talkgroups: {talkgroups}")
+
+            ts1_tgs = detail_data.get("ts1_talkgroups", "")
+            ts2_tgs = detail_data.get("ts2_talkgroups", "")
+            if ts1_tgs:
+                notes.append(f"TS1: {ts1_tgs}")
+            if ts2_tgs:
+                notes.append(f"TS2: {ts2_tgs}")
+
+        # Add other detail data that wasn't used in specific columns
+        excluded_keys = {
+            "downlink_freq",
+            "uplink_freq",
+            "offset_mhz",
+            "tone_up",
+            "tone_down",
+            "tone",
+            "is_dmr",
+            "dmr_color_code",
+            "dmr_id",
+            "county",
+            "call",
+            "callsign",
+            "use",
+            "status",
+            "sponsor",
+            "affiliate",
+            "coordination",
+            "fm",
+            "updated",
+            "reviewed",
+            "echolink_node",
+            "echolink_node_status",
+            "echolink_callsign",
+            "echolink_location",
+            "echolink_last_activity",
+            "grid_squares",
+            "talkgroups",
+            "ts1_talkgroups",
+            "ts2_talkgroups",
+            "talkgroup_count",
+        }
+
+        for key, value in detail_data.items():
+            if key not in excluded_keys and value and str(value).strip():
+                # Clean up key for display
+                display_key = key.replace("_", " ").title()
+                notes.append(f"{display_key}: {value}")
+
+        # Add basic data that wasn't used
+        for col in basic_row.index:
+            if (
+                col not in ["frequency", "call", "callsign", "county", "use", "status"]
+                and pd.notna(basic_row[col])
+                and str(basic_row[col]).strip()
+            ):
+                display_col = col.replace("_", " ").title()
+                notes.append(f"{display_col}: {basic_row[col]}")
+
+        return "; ".join(notes)
 
     # Override the base _download method to use our enhanced scraping
     def _download(self, level: str, **kwargs) -> pd.DataFrame:
