@@ -173,7 +173,8 @@ class RepeaterBookDownloader:
             )
 
             self.logger.debug(
-                f"CSV export response: {response.status_code} {response.headers.get('content-type', 'unknown')}"
+                f"CSV export response: {response.status_code} "
+                f"{response.headers.get('content-type', 'unknown')}"
             )
 
             if response.status_code == 200 and "text/csv" in response.headers.get(
@@ -262,7 +263,8 @@ class RepeaterBookDownloader:
 
             df = dfs[0]  # Take the first (and likely only) table
             self.logger.info(
-                f"Successfully parsed HTML table: {len(df)} rows, {len(df.columns)} columns"
+                f"Successfully parsed HTML table: {len(df)} rows, "
+                f"{len(df.columns)} columns"
             )
             self.logger.debug(f"Table columns: {list(df.columns)}")
 

@@ -155,7 +155,8 @@ class BaofengDM32UVFormatter(BaseRadioFormatter):
 
             formatted_data.append(formatted_row)
             self.logger.debug(
-                f"Formatted channel {channel}: {channel_name} @ {rx_freq} ({channel_type})"
+                f"Formatted channel {channel}: {channel_name} @ {rx_freq} "
+                f"({channel_type})"
             )
 
         if not formatted_data:

@@ -102,7 +102,8 @@ def validate_csv_columns(
         ValueError: If required columns are missing
     """
     logger.debug(
-        f"Validating columns. Required: {required_columns}, Present: {list(data.columns)}"
+        f"Validating columns. Required: {required_columns}, "
+        f"Present: {list(data.columns)}"
     )
 
     missing_columns = [col for col in required_columns if col not in data.columns]
@@ -115,7 +116,8 @@ def validate_csv_columns(
         )
 
     logger.info(
-        f"Column validation passed: all {len(required_columns)} required columns present"
+        f"Column validation passed: all {len(required_columns)} required "
+        f"columns present"
     )
     return True
 

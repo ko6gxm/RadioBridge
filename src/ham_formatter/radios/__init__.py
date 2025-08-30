@@ -58,7 +58,9 @@ def get_radio_formatter(radio_name: str) -> Optional[BaseRadioFormatter]:
         Formatter instance if found, None otherwise
     """
     logger = get_logger(__name__)
-    logger.debug(f"Looking for formatter for radio: {radio_name}")
+    logger.debug(
+        f"Looking for formatter for radio: {radio_name}, Found aliases: {RADIO_ALIASES}"
+    )
 
     # Normalize the radio name
     normalized_name = radio_name.lower().strip()
@@ -76,7 +78,8 @@ def get_radio_formatter(radio_name: str) -> Optional[BaseRadioFormatter]:
         canonical_name = RADIO_ALIASES[normalized_name]
         formatter_class = RADIO_FORMATTERS[canonical_name]
         logger.info(
-            f"Found alias match for {radio_name} -> {canonical_name} -> {formatter_class.__name__}"
+            f"Found alias match for {radio_name} -> {canonical_name} -> "
+            f"{formatter_class.__name__}"
         )
         return formatter_class()
 

@@ -1,8 +1,6 @@
 """Tests for logging configuration and functionality."""
 
 import logging
-import tempfile
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pandas as pd
@@ -112,17 +110,15 @@ class TestCLILogging:
             assert result.exit_code == 0
 
             # Should see more detailed logging with verbose
-            debug_logs = [
-                record for record in caplog.records if record.levelno == logging.DEBUG
-            ]
-            # Note: We may not see debug logs in this simple test, but we verify setup works
+            # Note: We may not see debug logs in this simple test, but we verify
+            # setup works
 
     def test_cli_download_with_logging(self, caplog, tmp_path):
         """Test that download command generates appropriate log messages."""
         with caplog.at_level(logging.INFO):
             # Use mock to avoid actual HTTP requests
             with patch("ham_formatter.cli.download_repeater_data") as mock_download:
-                with patch("ham_formatter.cli.write_csv") as mock_write:
+                with patch("ham_formatter.cli.write_csv"):
                     # Create a proper pandas DataFrame mock
                     import pandas as pd
 
@@ -174,7 +170,7 @@ class TestCLILogging:
                 with patch(
                     "ham_formatter.cli.get_radio_formatter"
                 ) as mock_get_formatter:
-                    with patch("ham_formatter.cli.write_csv") as mock_write:
+                    with patch("ham_formatter.cli.write_csv"):
 
                         # Set up mocks
                         mock_data = MagicMock()
@@ -226,7 +222,7 @@ class TestModuleLogging:
         from ham_formatter.downloader import RepeaterBookDownloader
 
         with caplog.at_level(logging.DEBUG):
-            downloader = RepeaterBookDownloader(timeout=10)
+            RepeaterBookDownloader(timeout=10)
 
             # Should log initialization
             init_logs = [

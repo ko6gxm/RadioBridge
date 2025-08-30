@@ -207,7 +207,8 @@ def format(
             f"{radio} to {output}"
         )
         logger.info(
-            f"Format completed: {len(formatted_data)} entries for {radio} saved to {output}"
+            f"Format completed: {len(formatted_data)} entries for "
+            f"{radio} saved to {output}"
         )
 
     except Exception as e:
