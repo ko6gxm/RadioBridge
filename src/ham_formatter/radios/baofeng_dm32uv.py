@@ -113,7 +113,7 @@ class BaofengDM32UVFormatter(BaseRadioFormatter):
                 continue
 
             # Calculate TX frequency from offset
-            offset = self.clean_offset(row.get("offset", 0))
+            offset = self.clean_offset(self.get_offset_value(row))
             if offset and offset != "0.000000":
                 try:
                     rx_float = float(rx_freq)
@@ -128,22 +128,10 @@ class BaofengDM32UVFormatter(BaseRadioFormatter):
             # legacy tone columns)
             tone_up, tone_down = self.get_tone_values(row)
 
-            # Generate channel name
-            location = row.get("location", row.get("city", ""))
-            callsign = row.get("callsign", row.get("call", ""))
-
-            if location and callsign:
-                # Keep it short for DM-32UV display
-                channel_name = f"{callsign}-{location[:8]}"
-            elif location:
-                channel_name = str(location)[:16]
-            elif callsign:
-                channel_name = str(callsign)[:16]
-            else:
+            # Generate channel name using base class helper
+            channel_name = self.build_channel_name(row, max_length=16, location_slice=8)
+            if not channel_name:
                 channel_name = f"CH{channel:03d}"
-
-            # Limit name for DM-32UV display (16 chars max)
-            channel_name = channel_name[:16]
 
             # Determine if this is a digital repeater (DMR)
             # Check for DMR indicators in the data
@@ -203,7 +191,7 @@ class BaofengDM32UVFormatter(BaseRadioFormatter):
                 "Direct Dual Mode": "0",
                 "Private Confirm": "0",
                 "Short Data Confirm": "0",
-                "DMR ID": callsign if callsign else "None",
+                "DMR ID": self.get_callsign(row) or "None",
                 "CTC/DCS Decode": ctc_decode,
                 "CTC/DCS Encode": ctc_encode,
                 "Scramble": "None",

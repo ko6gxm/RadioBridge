@@ -102,7 +102,7 @@ class Anytone878Formatter(BaseRadioFormatter):
                 continue  # Skip rows without valid frequency
 
             # Calculate transmit frequency from offset if available
-            offset = self.clean_offset(row.get("offset", 0))
+            offset = self.clean_offset(self.get_offset_value(row))
             if offset and offset != "0.000000":
                 try:
                     rx_float = float(rx_freq)
@@ -117,21 +117,10 @@ class Anytone878Formatter(BaseRadioFormatter):
             # legacy tone columns)
             tone_up, tone_down = self.get_tone_values(row)
 
-            # Generate channel name
-            location = row.get("location", row.get("city", row.get("callsign", "")))
-            callsign = row.get("callsign", "")
-
-            if location and callsign:
-                channel_name = f"{location} ({callsign})"
-            elif location:
-                channel_name = str(location)
-            elif callsign:
-                channel_name = str(callsign)
-            else:
+            # Generate channel name using base class helper (CallSign-Location format)
+            channel_name = self.build_channel_name(row, max_length=16, location_slice=8)
+            if not channel_name:
                 channel_name = f"CH{channel_num:03d}"
-
-            # Limit channel name to 16 characters (Anytone limitation)
-            channel_name = channel_name[:16]
 
             # Determine channel type based on frequency
             rx_float = float(rx_freq)

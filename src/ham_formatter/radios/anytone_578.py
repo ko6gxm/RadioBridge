@@ -98,7 +98,7 @@ class Anytone578Formatter(BaseRadioFormatter):
                 continue
 
             # Calculate TX frequency
-            offset = self.clean_offset(row.get("offset", 0))
+            offset = self.clean_offset(self.get_offset_value(row))
             if offset and offset != "0.000000":
                 try:
                     rx_float = float(rx_freq)
@@ -113,21 +113,13 @@ class Anytone578Formatter(BaseRadioFormatter):
             # legacy tone columns)
             tone_up, tone_down = self.get_tone_values(row)
 
-            # Generate channel name (mobile radios can handle longer names)
-            location = row.get("location", row.get("city", row.get("callsign", "")))
-            callsign = row.get("callsign", "")
-
-            if location and callsign:
-                channel_name = f"{location} ({callsign})"
-            elif location:
-                channel_name = str(location)
-            elif callsign:
-                channel_name = str(callsign)
-            else:
+            # Generate channel name using base class helper (CallSign-Location format)
+            # Mobile radios can handle longer names (20 chars)
+            channel_name = self.build_channel_name(
+                row, max_length=20, location_slice=10
+            )
+            if not channel_name:
                 channel_name = f"CH{channel_num:03d}"
-
-            # Limit to 20 characters for mobile radio
-            channel_name = channel_name[:20]
 
             formatted_row = {
                 "Channel Number": channel_num,

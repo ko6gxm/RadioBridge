@@ -85,7 +85,7 @@ class BaofengK5Formatter(BaseRadioFormatter):
                 continue
 
             # Calculate TX frequency
-            offset = self.clean_offset(row.get("offset", 0))
+            offset = self.clean_offset(self.get_offset_value(row))
             if offset and offset != "0.000000":
                 try:
                     rx_float = float(rx_freq)
@@ -100,23 +100,11 @@ class BaofengK5Formatter(BaseRadioFormatter):
             # legacy tone columns)
             tone_up, tone_down = self.get_tone_values(row)
 
-            # Generate channel name
-            location = row.get("location", row.get("city", ""))
-            callsign = row.get("callsign", "")
-
-            if location and callsign:
-                channel_name = (
-                    f"{location[:6]} {callsign}"  # K5 has very limited display
-                )
-            elif location:
-                channel_name = str(location)[:12]
-            elif callsign:
-                channel_name = str(callsign)
-            else:
+            # Generate channel name using base class helper (CallSign-Location format)
+            # K5 has very limited display (12 chars max)
+            channel_name = self.build_channel_name(row, max_length=12, location_slice=6)
+            if not channel_name:
                 channel_name = f"CH{channel:03d}"
-
-            # Limit name for K5 Plus display
-            channel_name = channel_name[:12]
 
             # Determine power based on frequency band
             rx_float = float(rx_freq)

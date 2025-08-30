@@ -13,6 +13,12 @@ class BaseRadioFormatter(ABC):
 
     All radio formatters must inherit from this class and implement
     the required methods for converting repeater data to their specific format.
+
+    This base class also provides common utilities for:
+    - Cleaning and formatting frequencies/offsets/tones
+    - Extracting tone values from multiple possible column names
+    - Deriving callsign and location values from varied input schemas
+    - Building channel names in a consistent CallSign-Location format
     """
 
     def __init__(self):
@@ -156,15 +162,10 @@ class BaseRadioFormatter(ABC):
     ) -> Tuple[Optional[str], Optional[str]]:
         """Get tone_up and tone_down values from row data.
 
-        This method first tries to get values from separate tone_up/tone_down columns.
-        If those don't exist, it falls back to a single tone column for both values.
-
-        Args:
-            row: Pandas Series representing a row of repeater data
-            fallback_tone_column: Column name to use if tone_up/tone_down don't exist
-
-        Returns:
-            Tuple of (tone_up, tone_down) as cleaned strings or None
+        Order of precedence:
+        1) Explicit columns: tone_up / tone_down
+        2) Common alt names: "Uplink Tone" (up), "Downlink Tone" (down)
+        3) Fallback single tone column (same for up/down)
         """
         # First, try to get separate tone values
         tone_up = None
@@ -174,6 +175,12 @@ class BaseRadioFormatter(ABC):
             tone_up = self.clean_tone(row.get("tone_up"))
         if "tone_down" in row:
             tone_down = self.clean_tone(row.get("tone_down"))
+
+        # Try common alternate column names if still missing
+        if tone_up is None and "Uplink Tone" in row:
+            tone_up = self.clean_tone(row.get("Uplink Tone"))
+        if tone_down is None and "Downlink Tone" in row:
+            tone_down = self.clean_tone(row.get("Downlink Tone"))
 
         # If we have separate values, use them
         if tone_up is not None or tone_down is not None:
@@ -186,6 +193,18 @@ class BaseRadioFormatter(ABC):
 
         # No tone information available
         return (None, None)
+
+    def get_offset_value(self, row: pd.Series) -> Any:
+        """Retrieve an offset value from common column names.
+
+        Looks for lowercase 'offset' first, then titlecase 'Offset'.
+        Returns 0 if neither is present.
+        """
+        if "offset" in row:
+            return row.get("offset")
+        if "Offset" in row:
+            return row.get("Offset")
+        return 0
 
     def clean_offset(self, offset: Any) -> Optional[str]:
         """Clean and format offset data.
@@ -222,3 +241,71 @@ class BaseRadioFormatter(ABC):
                 return "0.000000"
         except ValueError:
             return offset_str
+
+    # ------------------------- Callsign/Location helpers -------------------------
+    def get_callsign(self, row: pd.Series) -> Optional[str]:
+        """Extract callsign from common column names.
+
+        Checks: 'callsign', 'call', 'Call' (in that order). Returns None if not found.
+        """
+        for key in ("callsign", "call", "Call"):
+            if key in row:
+                val = row.get(key)
+                if pd.notna(val) and str(val).strip():
+                    return str(val).strip()
+        return None
+
+    def get_location(self, row: pd.Series) -> Optional[str]:
+        """Extract location from common columns or parse from Notes.
+
+        Checks 'location', 'city'. If not present, attempts to parse 'Notes' for
+        a pattern like 'Location: <value>' and returns the first clause up to
+        a comma/semicolon/newline. Removes common suffix ', CA'.
+        """
+        for key in ("location", "city"):
+            if key in row:
+                val = row.get(key)
+                if pd.notna(val) and str(val).strip():
+                    return str(val).strip()
+
+        # Try parsing from Notes
+        if "Notes" in row and pd.notna(row.get("Notes")):
+            import re
+
+            notes = str(row.get("Notes"))
+            match = re.search(r"Location:\s*([^;,\n]+)", notes)
+            if match:
+                loc = match.group(1).strip()
+                loc = loc.replace(", CA", "").replace(" CA", "")
+                if "," in loc:
+                    loc = loc.split(",")[0].strip()
+                return loc
+        return None
+
+    def build_channel_name(
+        self,
+        row: pd.Series,
+        max_length: int,
+        location_slice: int = 8,
+        separator: str = "-",
+    ) -> str:
+        """Build a channel name in CallSign-Location format with fallbacks.
+
+        - Uses callsign-location when both are available
+        - If only one is available, returns that
+        - Otherwise returns a placeholder (to be handled by caller if desired)
+        The final string is truncated to max_length characters.
+        """
+        callsign = self.get_callsign(row) or ""
+        location = self.get_location(row) or ""
+
+        if callsign and location:
+            name = f"{callsign}{separator}{location[:location_slice]}"
+        elif callsign:
+            name = callsign
+        elif location:
+            name = location[:location_slice]
+        else:
+            name = ""
+
+        return name[:max_length]
