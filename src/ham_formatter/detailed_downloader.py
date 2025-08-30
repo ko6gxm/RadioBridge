@@ -621,9 +621,15 @@ class DetailedRepeaterDownloader(RepeaterBookDownloader):
         if dmr_id_match:
             detail_data["dmr_id"] = dmr_id_match.group(1)
 
-        # Check if it's a DMR repeater
-        if "DMR" in text:
+        # Only mark as DMR repeater if it has BOTH color code AND DMR ID
+        # (actual operational DMR data, not just mention of DMR)
+        has_color_code = "dmr_color_code" in detail_data
+        has_dmr_id = "dmr_id" in detail_data
+
+        if has_color_code and has_dmr_id:
             detail_data["is_dmr"] = "true"
+        else:
+            detail_data["is_dmr"] = "false"
 
     def _extract_talkgroup_data(self, text: str, detail_data: Dict[str, Any]) -> None:
         """Extract and format talkgroup information for DMR repeaters.
