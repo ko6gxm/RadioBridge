@@ -145,6 +145,10 @@ def download(
 
     Note: --state is required for all searches.
     """
+    # Reconfigure logging if debug mode is requested
+    if debug:
+        setup_logging(verbose=True, log_file=ctx.obj.get("log_file"))
+
     logger = get_logger(__name__)
 
     # Validate and process band filtering

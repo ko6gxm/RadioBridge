@@ -300,6 +300,7 @@ class TestDownloadCommand:
             rate_limit=1.0,  # Still passes the original rate_limit
             temp_dir=None,
             nohammer=True,  # But also passes the nohammer flag
+            debug=False,  # Debug flag is passed as False by default
         )
         mock_write_csv.assert_called_once()
 
