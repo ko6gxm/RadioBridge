@@ -7,11 +7,20 @@ from typing import Optional
 import click
 
 from ham_formatter import __version__
+from ham_formatter.band_filter import (
+    validate_bands,
+    format_band_list,
+)
 from ham_formatter.csv_utils import read_csv, write_csv
 from ham_formatter.downloader import (
     download_repeater_data,
     download_repeater_data_by_county,
     download_repeater_data_by_city,
+)
+from ham_formatter.detailed_downloader import (
+    download_with_details,
+    download_with_details_by_county,
+    download_with_details_by_city,
 )
 from ham_formatter.logging_config import setup_logging, get_logger
 from ham_formatter.radios import get_supported_radios, get_radio_formatter
@@ -62,6 +71,43 @@ def main(ctx: click.Context, verbose: bool, log_file: Optional[str]) -> None:
     type=click.Path(path_type=Path),
     help="Output file path (default: auto-generated based on search criteria)",
 )
+@click.option(
+    "--band",
+    "-b",
+    multiple=True,
+    help="Amateur radio band(s) to include (e.g., 2m, 70cm, all). "
+    "Can be specified multiple times.",
+)
+@click.option(
+    "--detailed",
+    "-d",
+    is_flag=True,
+    help="Download detailed information from individual repeater pages "
+    "(slower but more comprehensive)",
+)
+@click.option(
+    "--rate-limit",
+    type=float,
+    default=1.0,
+    help="Minimum seconds between requests when using --detailed (default: 1.0)",
+)
+@click.option(
+    "--temp-dir",
+    type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
+    help="Directory for temporary files during detailed collection "
+    "(default: system temp)",
+)
+@click.option(
+    "--nohammer",
+    "-n",
+    is_flag=True,
+    help="Use random rate limiting (1-10 seconds) to be extra respectful to servers",
+)
+@click.option(
+    "--debug",
+    is_flag=True,
+    help="Enable debug logging to show all collected data from each detail page",
+)
 @click.pass_context
 def download(
     ctx: click.Context,
@@ -70,6 +116,12 @@ def download(
     city: Optional[str],
     country: str,
     output: Optional[Path],
+    band: tuple,
+    detailed: bool,
+    rate_limit: float,
+    temp_dir: Optional[Path],
+    nohammer: bool,
+    debug: bool,
 ) -> None:
     """Download repeater data from RepeaterBook.com.
 
@@ -78,9 +130,30 @@ def download(
     - County within state: --state CA --county "Los Angeles"
     - City within state: --state TX --city Austin
 
+    Band filtering:
+    - All bands (default): no --band option or --band all
+    - Single band: --band 2m
+    - Multiple bands: --band 2m --band 70cm
+    - Supported bands: 6m, 4m, 2m, 70cm, 33cm, 23cm
+
+    Detailed mode (--detailed):
+    - Downloads additional information from individual repeater detail pages
+    - Much slower but provides complete repeater specifications
+    - Use --rate-limit to control request frequency (default: 1.0 seconds)
+    - Use --temp-dir to specify where temporary files are stored
+    - Use --nohammer to enable random rate limiting (1-10s) for extra server respect
+
     Note: --state is required for all searches.
     """
     logger = get_logger(__name__)
+
+    # Validate and process band filtering
+    try:
+        bands = validate_bands(list(band)) if band else ["all"]
+        logger.debug(f"Requested bands: {list(band)} -> normalized: {bands}")
+    except ValueError as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
 
     # Validate search criteria
     search_options = [bool(county), bool(city)]
@@ -98,6 +171,15 @@ def download(
         click.echo("Error: --state is required when using --county or --city", err=True)
         sys.exit(1)
 
+    # Handle nohammer option - log it but don't change rate_limit here
+    if nohammer:
+        logger.info(
+            "No-hammer mode enabled: will use random delays (1-10s) "
+            "for each detail request"
+        )
+        if not detailed:
+            logger.warning("No-hammer mode has no effect without --detailed flag")
+
     # Determine search type and parameters
     if county:
         search_type = "county"
@@ -110,17 +192,60 @@ def download(
         logger.info(f"Starting download for {state}, {country}")
 
     try:
-        # Call appropriate download function
-        if search_type == "county":
-            data = download_repeater_data_by_county(
-                state=state, county=county, country=country
-            )
-        elif search_type == "city":
-            data = download_repeater_data_by_city(
-                state=state, city=city, country=country
-            )
+        # Call appropriate download function with band filtering
+        if detailed:
+            if nohammer:
+                logger.info(
+                    "Using detailed scraping with no-hammer mode "
+                    "(random delays 1-10s)"
+                )
+            else:
+                logger.info(f"Using detailed scraping with rate limit: {rate_limit}s")
+
+            if search_type == "county":
+                data = download_with_details_by_county(
+                    state=state,
+                    county=county,
+                    country=country,
+                    bands=bands,
+                    rate_limit=rate_limit,
+                    temp_dir=temp_dir,
+                    nohammer=nohammer,
+                    debug=debug,
+                )
+            elif search_type == "city":
+                data = download_with_details_by_city(
+                    state=state,
+                    city=city,
+                    country=country,
+                    bands=bands,
+                    rate_limit=rate_limit,
+                    temp_dir=temp_dir,
+                    nohammer=nohammer,
+                    debug=debug,
+                )
+            else:
+                data = download_with_details(
+                    state=state,
+                    country=country,
+                    bands=bands,
+                    rate_limit=rate_limit,
+                    temp_dir=temp_dir,
+                    nohammer=nohammer,
+                    debug=debug,
+                )
         else:
-            data = download_repeater_data(state=state, country=country)
+            # Standard download without details
+            if search_type == "county":
+                data = download_repeater_data_by_county(
+                    state=state, county=county, country=country, bands=bands
+                )
+            elif search_type == "city":
+                data = download_repeater_data_by_city(
+                    state=state, city=city, country=country, bands=bands
+                )
+            else:
+                data = download_repeater_data(state=state, country=country, bands=bands)
 
         # Generate output filename if not provided
         if output is None:
@@ -144,10 +269,15 @@ def download(
         else:
             location = state
 
+        band_desc = format_band_list(bands)
         click.echo(
-            f"Successfully downloaded {len(data)} repeaters from {location} to {output}"
+            f"Successfully downloaded {len(data)} repeaters from {location} "
+            f"({band_desc}) to {output}"
         )
-        logger.info(f"Download completed: {len(data)} repeaters saved to {output}")
+        logger.info(
+            f"Download completed: {len(data)} repeaters from {band_desc} "
+            f"saved to {output}"
+        )
 
     except Exception as e:
         logger.error(f"Download failed: {e}")

@@ -34,13 +34,9 @@ class TestRepeaterBookDownloader:
         params = downloader._build_params("state", state="CA", country="United States")
 
         expected = {
-            "state_id": "CA",
-            "loc": "United States",
+            "state_id": "06",  # CA -> 06
             "band": "All",
-            "freq": "",
-            "band6": "",
-            "use": "All",
-            "sort": "Distance",
+            "type": "state",
         }
         assert params == expected
 
@@ -52,14 +48,10 @@ class TestRepeaterBookDownloader:
         )
 
         expected = {
-            "state_id": "CA",
-            "loc": "United States",
+            "state_id": "06",  # CA -> 06
             "band": "All",
-            "freq": "",
-            "band6": "",
-            "use": "All",
-            "sort": "Distance",
-            "county": "Los Angeles",
+            "type": "county",
+            "loc": "Los Angeles",
         }
         assert params == expected
 
@@ -71,16 +63,29 @@ class TestRepeaterBookDownloader:
         )
 
         expected = {
-            "state_id": "TX",
-            "loc": "United States",
+            "state_id": "48",  # TX -> 48
             "band": "All",
-            "freq": "",
-            "band6": "",
-            "use": "All",
-            "sort": "Distance",
-            "city": "Austin",
+            "type": "city",
+            "loc": "Austin",
         }
         assert params == expected
+
+    def test_get_state_id(self):
+        """Test state code to ID mapping."""
+        downloader = RepeaterBookDownloader()
+
+        # Test common states
+        assert downloader._get_state_id("CA") == "06"
+        assert downloader._get_state_id("TX") == "48"
+        assert downloader._get_state_id("NY") == "36"
+        assert downloader._get_state_id("FL") == "12"
+
+        # Test case insensitivity
+        assert downloader._get_state_id("ca") == "06"
+        assert downloader._get_state_id("tx") == "48"
+
+        # Test unknown state (should return as-is)
+        assert downloader._get_state_id("ZZ") == "ZZ"
 
     @responses.activate
     def test_download_by_county_success(self):
@@ -90,7 +95,7 @@ class TestRepeaterBookDownloader:
         with open(fixture_path) as f:
             html_content = f.read()
 
-        # Mock the HTTP response
+        # Mock the HTTP response with new URL structure
         responses.add(
             responses.GET,
             "https://www.repeaterbook.com/repeaters/downloads/index.php",
@@ -98,7 +103,7 @@ class TestRepeaterBookDownloader:
         )
         responses.add(
             responses.GET,
-            "https://www.repeaterbook.com/repeaters/index.php",
+            "https://www.repeaterbook.com/repeaters/location_search.php",
             body=html_content,
             status=200,
         )
@@ -123,7 +128,7 @@ class TestRepeaterBookDownloader:
         with open(fixture_path) as f:
             html_content = f.read()
 
-        # Mock the HTTP response
+        # Mock the HTTP response with new URL structure
         responses.add(
             responses.GET,
             "https://www.repeaterbook.com/repeaters/downloads/index.php",
@@ -131,7 +136,7 @@ class TestRepeaterBookDownloader:
         )
         responses.add(
             responses.GET,
-            "https://www.repeaterbook.com/repeaters/index.php",
+            "https://www.repeaterbook.com/repeaters/location_search.php",
             body=html_content,
             status=200,
         )
@@ -156,14 +161,14 @@ class TestRepeaterBookDownloader:
         )
         responses.add(
             responses.GET,
-            "https://www.repeaterbook.com/repeaters/index.php",
+            "https://www.repeaterbook.com/repeaters/location_search.php",
             body="<html><body><p>No repeaters found</p></body></html>",
             status=200,
         )
 
         downloader = RepeaterBookDownloader()
         with pytest.raises(
-            ValueError, match="No repeater table found for Los Angeles County, CA"
+            ValueError, match="No repeater table found for Los Angeles County, 06"
         ):
             downloader.download_by_county("CA", "Los Angeles")
 
@@ -214,7 +219,7 @@ class TestConvenienceFunctions:
 
         mock_downloader_class.assert_called_once_with(timeout=30)
         mock_downloader.download_by_county.assert_called_once_with(
-            "CA", "Los Angeles", "United States"
+            "CA", "Los Angeles", "United States", None
         )
         assert isinstance(result, pd.DataFrame)
 
@@ -231,7 +236,7 @@ class TestConvenienceFunctions:
 
         mock_downloader_class.assert_called_once_with(timeout=30)
         mock_downloader.download_by_city.assert_called_once_with(
-            "TX", "Austin", "United States"
+            "TX", "Austin", "United States", None
         )
         assert isinstance(result, pd.DataFrame)
 
@@ -247,5 +252,7 @@ class TestConvenienceFunctions:
         result = download_repeater_data("CA", "United States", 30)
 
         mock_downloader_class.assert_called_once_with(timeout=30)
-        mock_downloader.download_by_state.assert_called_once_with("CA", "United States")
+        mock_downloader.download_by_state.assert_called_once_with(
+            "CA", "United States", None
+        )
         assert isinstance(result, pd.DataFrame)

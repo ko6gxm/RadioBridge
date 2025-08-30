@@ -1,11 +1,15 @@
 """Download repeater data from RepeaterBook.com."""
 
-from typing import Dict, Optional, Any
+from typing import Dict, List, Optional, Any
 
 import pandas as pd
 import requests
 from bs4 import BeautifulSoup
 
+from ham_formatter.band_filter import (
+    get_repeaterbook_band_param,
+    filter_by_frequency,
+)
 from ham_formatter.logging_config import get_logger
 
 
@@ -29,13 +33,17 @@ class RepeaterBookDownloader:
         self.logger.debug(f"RepeaterBookDownloader initialized with timeout={timeout}s")
 
     def download_by_state(
-        self, state: str, country: str = "United States"
+        self,
+        state: str,
+        country: str = "United States",
+        bands: Optional[List[str]] = None,
     ) -> pd.DataFrame:
         """Download all repeaters for a specific state.
 
         Args:
             state: State/province code (e.g., 'CA', 'TX')
             country: Country name (default: 'United States')
+            bands: List of amateur radio bands to include (e.g., ['2m', '70cm'])
 
         Returns:
             DataFrame containing repeater information
@@ -44,10 +52,14 @@ class RepeaterBookDownloader:
             requests.RequestException: If download fails
             ValueError: If no data is found or parsing fails
         """
-        return self._download("state", state=state, country=country)
+        return self._download("state", state=state, country=country, bands=bands)
 
     def download_by_county(
-        self, state: str, county: str, country: str = "United States"
+        self,
+        state: str,
+        county: str,
+        country: str = "United States",
+        bands: Optional[List[str]] = None,
     ) -> pd.DataFrame:
         """Download all repeaters for a specific county.
 
@@ -55,6 +67,7 @@ class RepeaterBookDownloader:
             state: State/province code (e.g., 'CA', 'TX')
             county: County name (e.g., 'Los Angeles', 'Harris')
             country: Country name (default: 'United States')
+            bands: List of amateur radio bands to include (e.g., ['2m', '70cm'])
 
         Returns:
             DataFrame containing repeater information
@@ -63,10 +76,16 @@ class RepeaterBookDownloader:
             requests.RequestException: If download fails
             ValueError: If no data is found or parsing fails
         """
-        return self._download("county", state=state, county=county, country=country)
+        return self._download(
+            "county", state=state, county=county, country=country, bands=bands
+        )
 
     def download_by_city(
-        self, state: str, city: str, country: str = "United States"
+        self,
+        state: str,
+        city: str,
+        country: str = "United States",
+        bands: Optional[List[str]] = None,
     ) -> pd.DataFrame:
         """Download all repeaters for a specific city.
 
@@ -74,6 +93,7 @@ class RepeaterBookDownloader:
             state: State/province code (e.g., 'CA', 'TX')
             city: City name (e.g., 'Los Angeles', 'Austin')
             country: Country name (default: 'United States')
+            bands: List of amateur radio bands to include (e.g., ['2m', '70cm'])
 
         Returns:
             DataFrame containing repeater information
@@ -82,18 +102,21 @@ class RepeaterBookDownloader:
             requests.RequestException: If download fails
             ValueError: If no data is found or parsing fails
         """
-        return self._download("city", state=state, city=city, country=country)
+        return self._download(
+            "city", state=state, city=city, country=country, bands=bands
+        )
 
     def _download(self, level: str, **kwargs) -> pd.DataFrame:
         """Download repeater data at specified level.
 
         Args:
             level: Download level ('state', 'county', or 'city')
-            **kwargs: Parameters for the specific level
+            **kwargs: Parameters for the specific level including 'bands'
 
         Returns:
             DataFrame containing repeater information
         """
+        bands = kwargs.get("bands") or ["all"]
         params = self._build_params(level, **kwargs)
         self.logger.debug(f"Download parameters: {params}")
 
@@ -103,40 +126,122 @@ class RepeaterBookDownloader:
             self.logger.info(
                 f"Successfully downloaded data via CSV export ({len(csv_data)} rows)"
             )
+            # Apply frequency-based band filtering
+            csv_data = filter_by_frequency(csv_data, bands)
             return csv_data
 
         self.logger.info("CSV export not available, falling back to HTML scraping")
         # Fall back to HTML scraping
-        return self._scrape_html_table(params)
+        html_data = self._scrape_html_table(params)
+
+        # Apply frequency-based band filtering
+        return filter_by_frequency(html_data, bands)
 
     def _build_params(self, level: str, **kwargs) -> Dict[str, Any]:
         """Build query parameters for the specified level.
 
         Args:
             level: Download level ('state', 'county', or 'city')
-            **kwargs: Parameters for the specific level
+            **kwargs: Parameters for the specific level including 'bands'
 
         Returns:
             Dictionary of query parameters
         """
-        # Base parameters for all levels
+        # Get band filtering parameter
+        bands = kwargs.get("bands") or ["all"]
+        band_param = get_repeaterbook_band_param(bands)
+
+        # Convert state code to numeric ID for RepeaterBook
+        state_code = kwargs.get("state", "")
+        state_id = self._get_state_id(state_code)
+
+        # Base parameters for RepeaterBook location search
         params = {
-            "state_id": kwargs.get("state", ""),
-            "loc": kwargs.get("country", "United States"),
-            "band": "All",
-            "freq": "",
-            "band6": "",
-            "use": "All",
-            "sort": "Distance",
+            "state_id": state_id,
+            "band": band_param,
         }
 
         # Add level-specific parameters
         if level == "county":
-            params["county"] = kwargs.get("county", "")
+            params["type"] = "county"
+            params["loc"] = kwargs.get("county", "")
         elif level == "city":
-            params["city"] = kwargs.get("city", "")
+            params["type"] = "city"
+            params["loc"] = kwargs.get("city", "")
+        elif level == "state":
+            params["type"] = "state"
+            # For state-level, loc is not needed
 
+        self.logger.debug(f"Built params for bands {bands}: {params}")
         return params
+
+    def _get_state_id(self, state_code: str) -> str:
+        """Convert state code to RepeaterBook numeric state ID.
+
+        Args:
+            state_code: Two-letter state code (e.g., 'CA', 'TX')
+
+        Returns:
+            Numeric state ID string
+        """
+        # RepeaterBook state ID mapping (US states)
+        state_mapping = {
+            "AL": "01",
+            "AK": "02",
+            "AZ": "04",
+            "AR": "05",
+            "CA": "06",
+            "CO": "08",
+            "CT": "09",
+            "DE": "10",
+            "FL": "12",
+            "GA": "13",
+            "HI": "15",
+            "ID": "16",
+            "IL": "17",
+            "IN": "18",
+            "IA": "19",
+            "KS": "20",
+            "KY": "21",
+            "LA": "22",
+            "ME": "23",
+            "MD": "24",
+            "MA": "25",
+            "MI": "26",
+            "MN": "27",
+            "MS": "28",
+            "MO": "29",
+            "MT": "30",
+            "NE": "31",
+            "NV": "32",
+            "NH": "33",
+            "NJ": "34",
+            "NM": "35",
+            "NY": "36",
+            "NC": "37",
+            "ND": "38",
+            "OH": "39",
+            "OK": "40",
+            "OR": "41",
+            "PA": "42",
+            "RI": "44",
+            "SC": "45",
+            "SD": "46",
+            "TN": "47",
+            "TX": "48",
+            "UT": "49",
+            "VT": "50",
+            "VA": "51",
+            "WA": "53",
+            "WV": "54",
+            "WI": "55",
+            "WY": "56",
+            "DC": "11",
+        }
+
+        state_id = state_mapping.get(state_code.upper(), state_code)
+        self.logger.debug(f"Mapped state code '{state_code}' to ID '{state_id}'")
+        return state_id
 
     def _try_csv_export(self, params: Dict[str, Any]) -> Optional[pd.DataFrame]:
         """Attempt to download CSV export if available.
@@ -205,8 +310,8 @@ class RepeaterBookDownloader:
             requests.RequestException: If download fails
             ValueError: If no data is found or parsing fails
         """
-        # RepeaterBook.com search URL (this URL structure may need verification)
-        search_url = f"{self.BASE_URL}/repeaters/index.php"
+        # RepeaterBook.com location search URL
+        search_url = f"{self.BASE_URL}/repeaters/location_search.php"
 
         self.logger.debug(f"Scraping HTML from {search_url} with params: {params}")
 
@@ -244,12 +349,15 @@ class RepeaterBookDownloader:
 
         if not table:
             # Build error message from params
-            location_desc = params.get("state_id", "unknown")
-            if "county" in params:
-                location_desc = f"{params['county']} County, {location_desc}"
-            elif "city" in params:
-                location_desc = f"{params['city']}, {location_desc}"
-            location_desc += f", {params.get('loc', 'Unknown Country')}"
+            state_id = params.get("state_id", "unknown")
+            if params.get("type") == "county" and "loc" in params:
+                location_desc = f"{params['loc']} County, {state_id}"
+            elif params.get("type") == "city" and "loc" in params:
+                location_desc = f"{params['loc']}, {state_id}"
+            elif params.get("type") == "state":
+                location_desc = f"State {state_id}"
+            else:
+                location_desc = f"Location {state_id}"
             raise ValueError(f"No repeater table found for {location_desc}")
 
         # Convert HTML table to DataFrame
@@ -325,7 +433,8 @@ class RepeaterBookDownloader:
         # Rename columns if they match our mapping
         original_columns = list(df.columns)
         df.columns = [
-            column_mapping.get(col, col.lower().replace(" ", "_")) for col in df.columns
+            column_mapping.get(col, str(col).lower().replace(" ", "_"))
+            for col in df.columns
         ]
 
         renamed_cols = [
@@ -340,7 +449,10 @@ class RepeaterBookDownloader:
 
 
 def download_repeater_data(
-    state: str, country: str = "United States", timeout: int = 30
+    state: str,
+    country: str = "United States",
+    timeout: int = 30,
+    bands: Optional[List[str]] = None,
 ) -> pd.DataFrame:
     """Download repeater data from RepeaterBook.com.
 
@@ -351,6 +463,7 @@ def download_repeater_data(
         state: State/province code (e.g., 'CA', 'TX')
         country: Country name (default: 'United States')
         timeout: Request timeout in seconds
+        bands: List of amateur radio bands to include (e.g., ['2m', '70cm'])
 
     Returns:
         DataFrame containing repeater information
@@ -360,11 +473,15 @@ def download_repeater_data(
         ValueError: If no data is found or parsing fails
     """
     downloader = RepeaterBookDownloader(timeout=timeout)
-    return downloader.download_by_state(state, country)
+    return downloader.download_by_state(state, country, bands)
 
 
 def download_repeater_data_by_county(
-    state: str, county: str, country: str = "United States", timeout: int = 30
+    state: str,
+    county: str,
+    country: str = "United States",
+    timeout: int = 30,
+    bands: Optional[List[str]] = None,
 ) -> pd.DataFrame:
     """Download repeater data for a specific county from RepeaterBook.com.
 
@@ -376,6 +493,7 @@ def download_repeater_data_by_county(
         county: County name (e.g., 'Los Angeles', 'Harris')
         country: Country name (default: 'United States')
         timeout: Request timeout in seconds
+        bands: List of amateur radio bands to include (e.g., ['2m', '70cm'])
 
     Returns:
         DataFrame containing repeater information
@@ -385,11 +503,15 @@ def download_repeater_data_by_county(
         ValueError: If no data is found or parsing fails
     """
     downloader = RepeaterBookDownloader(timeout=timeout)
-    return downloader.download_by_county(state, county, country)
+    return downloader.download_by_county(state, county, country, bands)
 
 
 def download_repeater_data_by_city(
-    state: str, city: str, country: str = "United States", timeout: int = 30
+    state: str,
+    city: str,
+    country: str = "United States",
+    timeout: int = 30,
+    bands: Optional[List[str]] = None,
 ) -> pd.DataFrame:
     """Download repeater data for a specific city from RepeaterBook.com.
 
@@ -401,6 +523,7 @@ def download_repeater_data_by_city(
         city: City name (e.g., 'Los Angeles', 'Austin')
         country: Country name (default: 'United States')
         timeout: Request timeout in seconds
+        bands: List of amateur radio bands to include (e.g., ['2m', '70cm'])
 
     Returns:
         DataFrame containing repeater information
@@ -410,4 +533,4 @@ def download_repeater_data_by_city(
         ValueError: If no data is found or parsing fails
     """
     downloader = RepeaterBookDownloader(timeout=timeout)
-    return downloader.download_by_city(state, city, country)
+    return downloader.download_by_city(state, city, country, bands)

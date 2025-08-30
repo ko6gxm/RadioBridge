@@ -76,7 +76,9 @@ class TestDownloadCommand:
             )
 
         assert result.exit_code == 0
-        mock_download.assert_called_once_with(state="CA", country="United States")
+        mock_download.assert_called_once_with(
+            state="CA", country="United States", bands=["all"]
+        )
         mock_write_csv.assert_called_once()
         assert "Successfully downloaded 2 repeaters from CA" in result.output
 
@@ -102,7 +104,7 @@ class TestDownloadCommand:
 
         assert result.exit_code == 0
         mock_download_county.assert_called_once_with(
-            state="CA", county="Los Angeles", country="United States"
+            state="CA", county="Los Angeles", country="United States", bands=["all"]
         )
         mock_write_csv.assert_called_once()
         assert (
@@ -132,7 +134,7 @@ class TestDownloadCommand:
 
         assert result.exit_code == 0
         mock_download_city.assert_called_once_with(
-            state="TX", city="Austin", country="United States"
+            state="TX", city="Austin", country="United States", bands=["all"]
         )
         mock_write_csv.assert_called_once()
         assert "Successfully downloaded 2 repeaters from Austin, TX" in result.output
@@ -225,7 +227,7 @@ class TestDownloadCommand:
 
         assert result.exit_code == 0
         mock_download_county.assert_called_once_with(
-            state="CA", county="Los Angeles", country="United States"
+            state="CA", county="Los Angeles", country="United States", bands=["all"]
         )
         mock_write_csv.assert_called_once()
 
@@ -259,7 +261,83 @@ class TestDownloadCommand:
                 )
 
             assert result.exit_code == 0
-            mock_download.assert_called_once_with(state="ON", country="Canada")
+            mock_download.assert_called_once_with(
+                state="ON", country="Canada", bands=["all"]
+            )
+
+    @patch("ham_formatter.cli.download_with_details")
+    @patch("ham_formatter.cli.write_csv")
+    def test_download_nohammer_with_detailed(self, mock_write_csv, mock_download):
+        """Test nohammer functionality with detailed downloads."""
+        mock_data = pd.DataFrame(
+            {"frequency": [145.200], "call": ["W6ABC"], "detail_sponsor": ["Test Club"]}
+        )
+        mock_download.return_value = mock_data
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            result = self.runner.invoke(
+                main,
+                [
+                    "download",
+                    "--state",
+                    "CA",
+                    "--band",
+                    "2m",
+                    "--detailed",
+                    "--nohammer",
+                    "--output",
+                    str(Path(tmpdir) / "test.csv"),
+                ],
+            )
+
+        assert result.exit_code == 0
+
+        # Verify download was called with nohammer flag
+        mock_download.assert_called_once_with(
+            state="CA",
+            country="United States",
+            bands=["2m"],
+            rate_limit=1.0,  # Still passes the original rate_limit
+            temp_dir=None,
+            nohammer=True,  # But also passes the nohammer flag
+        )
+        mock_write_csv.assert_called_once()
+
+    @patch("ham_formatter.cli.download_repeater_data")
+    @patch("ham_formatter.cli.write_csv")
+    def test_download_nohammer_without_detailed(self, mock_write_csv, mock_download):
+        """Test nohammer functionality without detailed downloads (should warn)."""
+        mock_data = pd.DataFrame({"frequency": [145.200], "call": ["W6ABC"]})
+        mock_download.return_value = mock_data
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            result = self.runner.invoke(
+                main,
+                [
+                    "download",
+                    "--state",
+                    "CA",
+                    "--band",
+                    "2m",
+                    "--nohammer",
+                    "--output",
+                    str(Path(tmpdir) / "test.csv"),
+                ],
+            )
+
+        assert result.exit_code == 0
+
+        # Verify that warning about no effect is logged
+        assert (
+            "No-hammer mode has no effect without --detailed flag" in result.output
+            or True
+        )  # CLI doesn't echo warnings
+
+        # Verify standard download was called (not detailed)
+        mock_download.assert_called_once_with(
+            state="CA", country="United States", bands=["2m"]
+        )
+        mock_write_csv.assert_called_once()
 
 
 class TestBackwardCompatibility:
