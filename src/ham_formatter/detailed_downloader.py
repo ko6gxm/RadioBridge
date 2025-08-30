@@ -333,7 +333,7 @@ class DetailedRepeaterDownloader(RepeaterBookDownloader):
             if id_match:
                 detail_data["repeater_id"] = id_match.group(1)
 
-            # Extract key-value pairs
+            # Extract key-value pairs from text
             lines = text.split("\n")
             for line in lines:
                 line = line.strip()
@@ -349,6 +349,11 @@ class DetailedRepeaterDownloader(RepeaterBookDownloader):
                         # Only store non-empty values and skip generic keys
                         if value and key_clean not in ["", "call", "date", "details"]:
                             detail_data[key_clean] = value
+
+            # Extract EchoLink information from HTML
+            echolink_data = self._extract_echolink_info(soup, detail_url)
+            if echolink_data:
+                detail_data.update(echolink_data)
 
             # Extract frequencies with regex
             freq_matches = re.findall(r"(\d+\.\d+)", text)
@@ -428,6 +433,150 @@ class DetailedRepeaterDownloader(RepeaterBookDownloader):
                 time.sleep(sleep_time)
 
         self.last_request_time = time.time()
+
+    def _extract_echolink_info(
+        self, soup: BeautifulSoup, detail_url: str
+    ) -> Dict[str, Any]:
+        """Extract EchoLink information from repeater detail page.
+
+        Args:
+            soup: BeautifulSoup object of the detail page
+            detail_url: URL of the detail page for logging
+
+        Returns:
+            Dictionary with EchoLink data including node status
+        """
+        echolink_data = {}
+
+        try:
+            # Look for EchoLink in the HTML content
+            text = soup.get_text()
+
+            # Search for EchoLink pattern in text
+            echolink_match = re.search(
+                r"EchoLink:\s*(\d+)([^\n]*)", text, re.IGNORECASE
+            )
+            if echolink_match:
+                node_number = echolink_match.group(1)
+                status_text = echolink_match.group(2).strip()
+
+                echolink_data["echolink_node"] = node_number
+                echolink_data["echolink_status_text"] = status_text
+
+                # Look for EchoLink links in HTML
+                echolink_links = soup.find_all(
+                    "a", href=re.compile(r"echolink", re.IGNORECASE)
+                )
+
+                for link in echolink_links:
+                    href = link.get("href")
+                    if href and node_number in href:
+                        # Found EchoLink status link
+                        echolink_url = (
+                            href
+                            if href.startswith("http")
+                            else urljoin("https://www.echolink.org/", href)
+                        )
+                        echolink_data["echolink_url"] = echolink_url
+
+                        # Fetch EchoLink node status
+                        node_status = self._scrape_echolink_status(
+                            echolink_url, node_number
+                        )
+                        if node_status:
+                            echolink_data.update(node_status)
+                        break
+
+                if self.debug:
+                    self.logger.debug(
+                        f"EchoLink found for {detail_url}: Node {node_number}"
+                    )
+                    if "echolink_url" in echolink_data:
+                        self.logger.debug(f"  Link: {echolink_data['echolink_url']}")
+                    if "echolink_node_status" in echolink_data:
+                        self.logger.debug(
+                            f"  Status: {echolink_data['echolink_node_status']}"
+                        )
+
+        except Exception as e:
+            self.logger.debug(f"Error extracting EchoLink info from {detail_url}: {e}")
+
+        return echolink_data
+
+    def _scrape_echolink_status(
+        self, echolink_url: str, node_number: str
+    ) -> Dict[str, Any]:
+        """Scrape EchoLink node status from EchoLink website.
+
+        Args:
+            echolink_url: URL to the EchoLink node status page
+            node_number: EchoLink node number for validation
+
+        Returns:
+            Dictionary with EchoLink node status information
+        """
+        status_data = {}
+
+        try:
+            # Apply rate limiting for external requests
+            self._apply_rate_limit()
+
+            self.logger.debug(f"Fetching EchoLink status: {echolink_url}")
+            response = self.session.get(echolink_url, timeout=self.timeout)
+            response.raise_for_status()
+
+            soup = BeautifulSoup(response.content, "html.parser")
+            text = soup.get_text()
+
+            # Extract common EchoLink status information
+            # Look for status indicators
+            if "online" in text.lower():
+                status_data["echolink_node_status"] = "Online"
+            elif "offline" in text.lower():
+                status_data["echolink_node_status"] = "Offline"
+            else:
+                status_data["echolink_node_status"] = "Unknown"
+
+            # Look for callsign
+            callsign_match = re.search(r"([A-Z0-9]{3,8})", text)
+            if callsign_match:
+                status_data["echolink_callsign"] = callsign_match.group(1)
+
+            # Look for location information
+            location_patterns = [
+                r"Location:\s*([^\n]+)",
+                r"QTH:\s*([^\n]+)",
+                r"City:\s*([^\n]+)",
+            ]
+            for pattern in location_patterns:
+                location_match = re.search(pattern, text, re.IGNORECASE)
+                if location_match:
+                    status_data["echolink_location"] = location_match.group(1).strip()
+                    break
+
+            # Look for last activity
+            activity_patterns = [r"Last Activity:\s*([^\n]+)", r"Last Seen:\s*([^\n]+)"]
+            for pattern in activity_patterns:
+                activity_match = re.search(pattern, text, re.IGNORECASE)
+                if activity_match:
+                    status_data["echolink_last_activity"] = activity_match.group(
+                        1
+                    ).strip()
+                    break
+
+            if self.debug:
+                self.logger.debug(f"EchoLink status data for node {node_number}:")
+                for key, value in status_data.items():
+                    self.logger.debug(f"  {key}: {value}")
+
+        except Exception as e:
+            self.logger.debug(
+                f"Error fetching EchoLink status from {echolink_url}: {e}"
+            )
+            status_data["echolink_node_status"] = "Error"
+            status_data["echolink_error"] = str(e)
+
+        return status_data
 
     # Override the base _download method to use our enhanced scraping
     def _download(self, level: str, **kwargs) -> pd.DataFrame:

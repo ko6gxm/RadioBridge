@@ -277,3 +277,117 @@ class TestDetailedDownloaderFunctions:
         )
 
         assert result is mock_result
+
+
+class TestEchoLinkFunctionality:
+    """Test EchoLink extraction and status fetching functionality."""
+
+    def test_extract_echolink_info_basic(self):
+        """Test basic EchoLink information extraction."""
+        from bs4 import BeautifulSoup
+
+        downloader = DetailedRepeaterDownloader(debug=True)
+
+        # Mock HTML with EchoLink information
+        html_content = """
+        <html><body>
+        <p>Repeater Information:</p>
+        <p>EchoLink: 12345 (Online)</p>
+        <a href="https://www.echolink.org/logins.jsp?call=12345">EchoLink Status</a>
+        </body></html>
+        """
+
+        soup = BeautifulSoup(html_content, "html.parser")
+        result = downloader._extract_echolink_info(soup, "test_url")
+
+        assert "echolink_node" in result
+        assert result["echolink_node"] == "12345"
+        assert "echolink_status_text" in result
+        assert "Online" in result["echolink_status_text"]
+
+    def test_extract_echolink_info_no_echolink(self):
+        """Test EchoLink extraction when no EchoLink info present."""
+        from bs4 import BeautifulSoup
+
+        downloader = DetailedRepeaterDownloader()
+
+        html_content = """
+        <html><body>
+        <p>Repeater Information:</p>
+        <p>No EchoLink information here</p>
+        </body></html>
+        """
+
+        soup = BeautifulSoup(html_content, "html.parser")
+        result = downloader._extract_echolink_info(soup, "test_url")
+
+        assert result == {}  # Should return empty dict when no EchoLink found
+
+    @patch("requests.Session.get")
+    def test_scrape_echolink_status_online(self, mock_get):
+        """Test EchoLink status scraping for online node."""
+        downloader = DetailedRepeaterDownloader(debug=True)
+
+        # Mock EchoLink status page response
+        mock_response = Mock()
+        mock_response.raise_for_status.return_value = None
+        mock_response.content = b"""
+        <html><body>
+        <h1>W6ABC-R Node 12345</h1>
+        <p>Status: Online</p>
+        <p>Location: Los Angeles, CA</p>
+        <p>Last Activity: 2024-01-15 10:30:00</p>
+        </body></html>
+        """
+        mock_get.return_value = mock_response
+
+        result = downloader._scrape_echolink_status(
+            "https://www.echolink.org/logins.jsp?call=12345", "12345"
+        )
+
+        assert "echolink_node_status" in result
+        assert result["echolink_node_status"] == "Online"
+        assert "echolink_callsign" in result
+        assert "W6ABC" in result["echolink_callsign"]
+        assert "echolink_location" in result
+        assert "Los Angeles" in result["echolink_location"]
+        assert "echolink_last_activity" in result
+
+    @patch("requests.Session.get")
+    def test_scrape_echolink_status_error(self, mock_get):
+        """Test EchoLink status scraping when request fails."""
+        downloader = DetailedRepeaterDownloader()
+
+        # Mock failed request
+        mock_get.side_effect = Exception("Connection failed")
+
+        result = downloader._scrape_echolink_status(
+            "https://www.echolink.org/logins.jsp?call=12345", "12345"
+        )
+
+        assert "echolink_node_status" in result
+        assert result["echolink_node_status"] == "Error"
+        assert "echolink_error" in result
+        assert "Connection failed" in result["echolink_error"]
+
+    def test_extract_echolink_various_formats(self):
+        """Test EchoLink extraction with various text formats."""
+        from bs4 import BeautifulSoup
+
+        downloader = DetailedRepeaterDownloader()
+
+        test_cases = [
+            ("EchoLink: 123456", "123456", ""),
+            ("echolink: 78901 (Offline)", "78901", "(Offline)"),
+            ("ECHOLINK: 555123 Available", "555123", "Available"),
+        ]
+
+        for html_text, expected_node, expected_status in test_cases:
+            html_content = f"<html><body><p>{html_text}</p></body></html>"
+            soup = BeautifulSoup(html_content, "html.parser")
+            result = downloader._extract_echolink_info(soup, "test_url")
+
+            assert "echolink_node" in result
+            assert result["echolink_node"] == expected_node
+            assert "echolink_status_text" in result
+            assert expected_status in result["echolink_status_text"]
