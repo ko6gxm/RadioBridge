@@ -267,3 +267,88 @@ jobs:
         echo ""
         echo "📦 Install with: pip install radiobridge==${{ needs.validate-version.outputs.version }}"
         echo "🔗 Release URL: ${{ github.server_url }}/${{ github.repository }}/releases/tag/${{ needs.validate-version.outputs.tag }}"
+
+    - name: Notify Slack of successful release
+      uses: 8398a7/action-slack@v3
+      with:
+        status: custom
+        custom_payload: |
+          {
+            attachments: [{
+              color: 'good',
+              title: '🎉 RadioBridge Release ${{ needs.validate-version.outputs.version }} Published!',
+              title_link: '${{ github.server_url }}/${{ github.repository }}/releases/tag/${{ needs.validate-version.outputs.tag }}',
+              fields: [
+                {
+                  title: 'Version',
+                  value: '${{ needs.validate-version.outputs.version }}',
+                  short: true
+                },
+                {
+                  title: 'Tag',
+                  value: '${{ needs.validate-version.outputs.tag }}',
+                  short: true
+                },
+                {
+                  title: 'Installation',
+                  value: '`pip install radiobridge==${{ needs.validate-version.outputs.version }}`',
+                  short: false
+                },
+                {
+                  title: 'Links',
+                  value: '• <${{ github.server_url }}/${{ github.repository }}/releases/tag/${{ needs.validate-version.outputs.tag }}|GitHub Release>\n• <https://pypi.org/project/radiobridge/${{ needs.validate-version.outputs.version }}/|PyPI Package>',
+                  short: false
+                }
+              ],
+              footer: 'RadioBridge Release System',
+              ts: '${{ github.event.head_commit.timestamp }}'
+            }]
+          }
+      env:
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+  notify-failure:
+    name: Notify Release Failure
+    runs-on: ubuntu-latest
+    needs: [validate-version, build-and-test, create-release, publish-pypi]
+    if: failure()
+
+    steps:
+    - name: Notify Slack of release failure
+      uses: 8398a7/action-slack@v3
+      with:
+        status: custom
+        custom_payload: |
+          {
+            attachments: [{
+              color: 'danger',
+              title: '❌ RadioBridge Release ${{ needs.validate-version.outputs.version || github.ref_name }} Failed!',
+              title_link: '${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}',
+              fields: [
+                {
+                  title: 'Version',
+                  value: '${{ needs.validate-version.outputs.version || github.ref_name }}',
+                  short: true
+                },
+                {
+                  title: 'Trigger',
+                  value: '${{ github.event_name }}',
+                  short: true
+                },
+                {
+                  title: 'Job Status',
+                  value: '• Validation: ${{ needs.validate-version.result }}\n• Build & Test: ${{ needs.build-and-test.result }}\n• Create Release: ${{ needs.create-release.result }}\n• Publish PyPI: ${{ needs.publish-pypi.result }}',
+                  short: false
+                },
+                {
+                  title: 'Action Required',
+                  value: 'Check the workflow logs and fix any issues before retrying the release.',
+                  short: false
+                }
+              ],
+              footer: 'RadioBridge Release System',
+              ts: '${{ github.event.head_commit.timestamp }}'
+            }]
+          }
+      env:
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
