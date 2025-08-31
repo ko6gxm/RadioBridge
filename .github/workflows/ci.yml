@@ -256,3 +256,74 @@ jobs:
         fi
 
         echo "Link validation passed!"
+
+  # Slack notifications for CI completion
+  notify-slack:
+    name: Notify CI Completion
+    runs-on: ubuntu-latest
+    needs: [test, integration-test, build, security, performance, docs]
+    if: always() && (github.ref == 'refs/heads/main' || github.event_name == 'pull_request')
+
+    steps:
+    - name: Determine overall CI status
+      id: ci-status
+      run: |
+        # Check critical jobs (test and build are most important)
+        if [[ "${{ needs.test.result }}" == "success" && "${{ needs.build.result }}" == "success" ]]; then
+          echo "status=success" >> $GITHUB_OUTPUT
+          echo "emoji=✅" >> $GITHUB_OUTPUT
+          echo "color=good" >> $GITHUB_OUTPUT
+        else
+          echo "status=failure" >> $GITHUB_OUTPUT
+          echo "emoji=❌" >> $GITHUB_OUTPUT
+          echo "color=danger" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Notify Slack on CI completion
+      uses: 8398a7/action-slack@v3
+      with:
+        status: custom
+        custom_payload: |
+          {
+            attachments: [{
+              color: '${{ steps.ci-status.outputs.color }}',
+              title: '${{ steps.ci-status.outputs.emoji }} RadioBridge CI Pipeline',
+              title_link: '${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}',
+              fields: [
+                {
+                  title: 'Repository',
+                  value: '${{ github.repository }}',
+                  short: true
+                },
+                {
+                  title: 'Branch',
+                  value: '${{ github.ref_name }}',
+                  short: true
+                },
+                {
+                  title: 'Event',
+                  value: '${{ github.event_name }}',
+                  short: true
+                },
+                {
+                  title: 'Author',
+                  value: '${{ github.actor }}',
+                  short: true
+                },
+                {
+                  title: 'Overall Status',
+                  value: '${{ steps.ci-status.outputs.status }}',
+                  short: false
+                },
+                {
+                  title: 'Job Results',
+                  value: '• Tests: ${{ needs.test.result }}\n• Integration: ${{ needs.integration-test.result }}\n• Build: ${{ needs.build.result }}\n• Security: ${{ needs.security.result }}\n• Performance: ${{ needs.performance.result }}\n• Docs: ${{ needs.docs.result }}',
+                  short: false
+                }
+              ],
+              footer: 'RadioBridge CI',
+              ts: '${{ github.event.head_commit.timestamp }}'
+            }]
+          }
+      env:
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
