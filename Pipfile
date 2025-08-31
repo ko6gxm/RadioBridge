@@ -19,7 +19,7 @@ pre-commit = "*"
 ipython = "*"
 responses = "*"
 pytest-cov = "*"
+tomli = {version = "*", markers = "python_version < '3.11'"}
 
 [requires]
-python_version = "3.13"
-python_full_version = "3.13.7"
+python_version = "3.9"

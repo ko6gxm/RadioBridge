@@ -17,6 +17,7 @@ from radiobridge.csv_utils import (
     write_csv_with_comments,
     read_csv_comments,
 )
+
 # Unused imports removed for linting compliance
 from radiobridge.detailed_downloader import (
     download_with_details,
@@ -33,11 +34,12 @@ from radiobridge.radios import get_supported_radios, get_radio_formatter
 @click.option("--log-file", type=click.Path(), help="Write logs to specified file")
 @click.pass_context
 def main(ctx: click.Context, verbose: bool, log_file: Optional[str]) -> None:
-    """RadioBridge - Professional Amateur Radio Repeater Programming
+    """Professional Amateur Radio Repeater Programming.
 
     Bridge RepeaterBook data to popular radio models with advanced features
     including county/city targeting, detailed information collection, and
-    intelligent rate limiting."""
+    intelligent rate limiting.
+    """
     ctx.ensure_object(dict)
     ctx.obj["verbose"] = verbose
     ctx.obj["log_file"] = log_file
@@ -271,8 +273,8 @@ def download(
         location_desc = location
         band_desc = format_band_list(bands)
         click.echo(
-            f"RadioBridge: Successfully downloaded {len(data)} repeaters from {location_desc} "
-            f"({band_desc}) to {output}"
+            f"RadioBridge: Successfully downloaded {len(data)} repeaters from "
+            f"{location_desc} ({band_desc}) to {output}"
         )
         logger.info(
             f"Download completed: {len(data)} repeaters from {band_desc} "
@@ -418,8 +420,8 @@ def format(
         # Success message
         if len(files_created) == 1:
             click.echo(
-                f"RadioBridge: Successfully formatted {len(formatted_data)} repeaters for "
-                f"{formatter.radio_name} to {output}"
+                f"RadioBridge: Successfully formatted {len(formatted_data)} repeaters "
+                f"for {formatter.radio_name} to {output}"
             )
         else:
             click.echo(
