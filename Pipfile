@@ -18,6 +18,7 @@ pytest = "*"
 pre-commit = "*"
 ipython = "*"
 responses = "*"
+pytest-cov = "*"
 
 [requires]
 python_version = "3.13"

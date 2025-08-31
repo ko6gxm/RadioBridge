@@ -186,7 +186,9 @@ class TestBaofengDM32UVFormatter:
         assert formatter.radio_name == "Baofeng DM-32UV"
         assert "DMR" in formatter.description
         assert formatter.manufacturer == "Baofeng"
-        assert "frequency" in formatter.required_columns
+        assert (
+            formatter.required_columns == []
+        )  # Accepts both basic and detailed formats
         assert len(formatter.output_columns) == 40  # DM-32UV has 40 columns
         assert "No." in formatter.output_columns
         assert "RX Frequency[MHz]" in formatter.output_columns

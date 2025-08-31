@@ -1,7 +1,7 @@
 """Base class for radio formatters."""
 
 from abc import ABC, abstractmethod
-from typing import Any, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import pandas as pd
 
@@ -193,6 +193,30 @@ class BaseRadioFormatter(ABC):
 
         # No tone information available
         return (None, None)
+
+    def get_rx_frequency(self, row: pd.Series) -> Any:
+        """Retrieve RX frequency from common column names.
+
+        Checks for both basic downloader format ('frequency') and
+        detailed downloader format ('Downlink').
+        """
+        # Try detailed downloader format first
+        if "Downlink" in row:
+            return row.get("Downlink")
+        # Fall back to basic downloader format
+        if "frequency" in row:
+            return row.get("frequency")
+        return None
+
+    def get_tx_frequency(self, row: pd.Series) -> Any:
+        """Retrieve TX frequency from common column names.
+
+        Checks for detailed downloader format ('Uplink').
+        If not available, should calculate from RX + offset.
+        """
+        if "Uplink" in row:
+            return row.get("Uplink")
+        return None
 
     def get_offset_value(self, row: pd.Series) -> Any:
         """Retrieve an offset value from common column names.
@@ -440,14 +464,97 @@ class BaseRadioFormatter(ABC):
                 unique_names.append(name[:max_length])
 
             return unique_names
+
+    # ------------------------- Zone functionality -------------------------
+
+    def supports_zone_files(self) -> bool:
+        """Check if this radio supports zone files.
+
+        Returns:
+            True if the radio supports zone file generation
+        """
+        # Check if the subclass has overridden format_zones
+        return (
+            hasattr(self, "format_zones")
+            and self.__class__.format_zones is not BaseRadioFormatter.format_zones
+        )
+
+    def format_zones(
+        self,
+        formatted_data: pd.DataFrame,
+        csv_metadata: Optional[Dict[str, str]] = None,
+        zone_strategy: str = "location",
+        max_zones: int = 250,
+        max_channels_per_zone: int = 64,
+    ) -> pd.DataFrame:
+        """Format zone data for this radio (optional).
+
+        Args:
+            formatted_data: DataFrame with formatted channel information
+            csv_metadata: Metadata from CSV comments (contains county, state, city, etc.)
+            zone_strategy: Strategy for creating zones ('location', 'band', 'service')
+            max_zones: Maximum number of zones to create
+            max_channels_per_zone: Maximum channels per zone
+
+        Returns:
+            Formatted DataFrame with zone information
+
+        Raises:
+            NotImplementedError: If this radio doesn't support zone files
+        """
+        raise NotImplementedError(
+            f"{self.radio_name} does not support zone file generation"
+        )
+
+    def _get_zone_name_from_metadata(
+        self,
+        csv_metadata: Optional[Dict[str, str]] = None,
+        zone_strategy: str = "location",
+        max_length: int = 16,
+    ) -> str:
+        """Get zone name from CSV metadata based on strategy.
+
+        Args:
+            csv_metadata: Metadata from CSV comments
+            zone_strategy: Zone naming strategy
+            max_length: Maximum zone name length
+
+        Returns:
+            Zone name string
+        """
+        if not csv_metadata:
+            return "Unknown"
+
+        if zone_strategy == "location":
+            # Priority: county -> city -> state
+            if "county" in csv_metadata:
+                zone_name = csv_metadata["county"]
+            elif "city" in csv_metadata:
+                zone_name = csv_metadata["city"]
+            elif "state" in csv_metadata:
+                zone_name = csv_metadata["state"]
+            else:
+                zone_name = "Unknown"
+
+            # Add state abbreviation if we have county/city and state
+            if (
+                zone_name != "Unknown"
+                and "state" in csv_metadata
+                and zone_strategy == "location"
+            ):
+                state = csv_metadata["state"]
+                # Try to fit both location and state within limit
+                combined = f"{zone_name} {state}"
+                if len(combined) <= max_length:
+                    zone_name = combined
+
+            return zone_name[:max_length]
+
+        elif zone_strategy == "state":
+            return csv_metadata.get("state", "Unknown")[:max_length]
+
+        elif zone_strategy == "country":
+            return csv_metadata.get("country", "Unknown")[:max_length]
+
         else:
-            # For names without "-", just add numbers
-            max_num_digits = len(str(count))
-            base_part = base_name[: max_length - max_num_digits]
-
-            unique_names = []
-            for i in range(1, count + 1):
-                name = f"{base_part}{i}"
-                unique_names.append(name[:max_length])
-
-            return unique_names
+            return "Mixed"[:max_length]

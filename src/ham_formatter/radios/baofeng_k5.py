@@ -37,7 +37,7 @@ class BaofengK5Formatter(BaseRadioFormatter):
     @property
     def required_columns(self) -> List[str]:
         """List of column names required in the input data."""
-        return ["frequency"]
+        return []  # Accept both basic and detailed downloader formats
 
     @property
     def output_columns(self) -> List[str]:
@@ -78,24 +78,28 @@ class BaofengK5Formatter(BaseRadioFormatter):
         for idx, row in data.iterrows():
             channel = idx + start_channel
 
-            rx_freq = self.clean_frequency(row.get("frequency"))
+            # Get RX frequency (works with both basic and detailed downloader)
+            rx_freq = self.clean_frequency(self.get_rx_frequency(row))
             if not rx_freq:
-                self.logger.debug(
-                    f"Skipping row {idx}: invalid frequency {row.get('frequency')}"
-                )
+                self.logger.debug(f"Skipping row {idx}: no valid frequency found")
                 continue
 
-            # Calculate TX frequency
-            offset = self.clean_offset(self.get_offset_value(row))
-            if offset and offset != "0.000000":
-                try:
-                    rx_float = float(rx_freq)
-                    offset_float = float(offset)
-                    tx_freq = f"{rx_float + offset_float:.6f}"
-                except (ValueError, TypeError):
-                    tx_freq = rx_freq
+            # Get TX frequency - try detailed downloader first, then calculate from offset
+            tx_freq_raw = self.get_tx_frequency(row)
+            if tx_freq_raw:
+                tx_freq = self.clean_frequency(tx_freq_raw)
             else:
-                tx_freq = rx_freq
+                # Calculate TX frequency from offset (basic downloader)
+                offset = self.clean_offset(self.get_offset_value(row))
+                if offset and offset != "0.000000":
+                    try:
+                        rx_float = float(rx_freq)
+                        offset_float = float(offset)
+                        tx_freq = f"{rx_float + offset_float:.6f}"
+                    except (ValueError, TypeError):
+                        tx_freq = rx_freq
+                else:
+                    tx_freq = rx_freq
 
             # Get tone information (supports both new tone_up/tone_down and
             # legacy tone columns)

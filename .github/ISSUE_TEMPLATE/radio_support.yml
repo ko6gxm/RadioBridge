@@ -1,0 +1,154 @@
+name: Radio Support Request 📡
+description: Request support for a new radio model
+title: "[RADIO] Add support for "
+labels: ["enhancement", "radio-support", "triage"]
+assignees:
+  - ko6gxm
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for requesting support for a new radio model!
+
+        Adding radio support helps more amateur radio operators benefit from Ham Formatter.
+
+  - type: input
+    id: radio_manufacturer
+    attributes:
+      label: Manufacturer
+      description: Who makes this radio?
+      placeholder: "e.g., Yaesu, Icom, Kenwood, TYT"
+    validations:
+      required: true
+
+  - type: input
+    id: radio_model
+    attributes:
+      label: Radio Model
+      description: Full model name/number
+      placeholder: "e.g., FT-991A, IC-7300, TH-D74A"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: radio_type
+    attributes:
+      label: Radio Type
+      options:
+        - Handheld (HT)
+        - Mobile
+        - Base Station
+        - All-in-One (HF/VHF/UHF)
+        - Other
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: radio_modes
+    attributes:
+      label: Supported Modes
+      description: What modes does this radio support?
+      options:
+        - label: Analog FM
+        - label: DMR
+        - label: D-STAR
+        - label: System Fusion (C4FM)
+        - label: NXDN
+        - label: P25
+        - label: Other digital mode
+
+  - type: checkboxes
+    id: radio_bands
+    attributes:
+      label: Supported Bands
+      description: What amateur bands does this radio cover?
+      options:
+        - label: HF (3-30 MHz)
+        - label: 6m (50 MHz)
+        - label: 2m (144-148 MHz)
+        - label: 70cm (420-450 MHz)
+        - label: 33cm (902-928 MHz)
+        - label: 23cm (1240-1300 MHz)
+        - label: Other bands
+
+  - type: textarea
+    id: programming_software
+    attributes:
+      label: Programming Software
+      description: What software is used to program this radio?
+      placeholder: |
+        - Software name: e.g., "Yaesu ADMS-11"
+        - Version: e.g., "v1.2.3"
+        - CSV format details: column names, special requirements, etc.
+    validations:
+      required: true
+
+  - type: textarea
+    id: csv_format
+    attributes:
+      label: CSV Format Details
+      description: If you have example CSV files or know the format, please describe it
+      placeholder: |
+        Column names: Channel, Frequency, Name, Tone, etc.
+        Special formatting: frequency precision, tone format, etc.
+        Required fields: what columns must be present?
+
+  - type: textarea
+    id: sample_csv
+    attributes:
+      label: Sample CSV (if available)
+      description: If you have a sample CSV file, paste the first few rows here
+      render: csv
+      placeholder: |
+        Channel,Frequency,Name,Tone
+        1,146.5200,Simplex,88.5
+        2,147.0000,W6ABC,100.0
+
+  - type: input
+    id: documentation_links
+    attributes:
+      label: Documentation Links
+      description: Any links to programming manuals or CSV format documentation
+      placeholder: "https://..."
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: How popular is this radio?
+      description: This helps prioritize development effort
+      options:
+        - "Very popular - many users would benefit"
+        - "Moderately popular - some users would benefit"
+        - "Niche model - few users but important use case"
+        - "Not sure"
+
+  - type: textarea
+    id: additional_info
+    attributes:
+      label: Additional Information
+      description: Any other details that would help implement support for this radio
+
+  - type: checkboxes
+    id: contribution
+    attributes:
+      label: Contribution Willingness
+      description: Are you able to help with implementation?
+      options:
+        - label: I can test the implementation with real hardware
+        - label: I can provide sample CSV files
+        - label: I can help with documentation
+        - label: I can help with code development
+        - label: I can only provide feedback and testing
+
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Checklist
+      options:
+        - label: I have searched existing issues for this radio model
+          required: true
+        - label: I have provided programming software details
+          required: true
+        - label: I am willing to help test the implementation
+          required: true

@@ -1,0 +1,129 @@
+name: Bug Report 🐛
+description: Report a bug to help us improve Ham Formatter
+title: "[BUG] "
+labels: ["bug", "triage"]
+assignees:
+  - ko6gxm
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug! This helps make Ham Formatter better for the entire amateur radio community.
+
+        Before submitting, please search existing issues to avoid duplicates.
+
+  - type: input
+    id: version
+    attributes:
+      label: Ham Formatter Version
+      description: What version of Ham Formatter are you using?
+      placeholder: "e.g., 0.2.0"
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug Description
+      description: A clear and concise description of what the bug is.
+      placeholder: "The download fails when..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to Reproduce
+      description: Steps to reproduce the behavior
+      placeholder: |
+        1. Run command 'ham-formatter download --state CA'
+        2. See error...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: What you expected to happen
+      placeholder: "The download should complete successfully..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual Behavior
+      description: What actually happened
+      placeholder: "Instead, I got an error message..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: error_output
+    attributes:
+      label: Error Output
+      description: If applicable, paste any error messages or stack traces
+      render: shell
+      placeholder: |
+        Traceback (most recent call last):
+        ...
+
+  - type: input
+    id: command
+    attributes:
+      label: Command Used
+      description: The exact command that caused the issue
+      placeholder: "ham-formatter download --state CA --county 'Los Angeles'"
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating System
+      options:
+        - Windows
+        - macOS
+        - Linux
+        - Other (specify in additional context)
+    validations:
+      required: true
+
+  - type: input
+    id: python_version
+    attributes:
+      label: Python Version
+      description: What version of Python are you using?
+      placeholder: "e.g., 3.11.5"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: installation
+    attributes:
+      label: Installation Method
+      options:
+        - pip install
+        - Development setup (pipenv)
+        - GitHub clone
+        - Other (specify in additional context)
+    validations:
+      required: true
+
+  - type: textarea
+    id: additional_context
+    attributes:
+      label: Additional Context
+      description: Add any other context about the problem here (network setup, proxy, etc.)
+
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Checklist
+      options:
+        - label: I have searched existing issues for duplicates
+          required: true
+        - label: I am using the latest version of Ham Formatter
+          required: true
+        - label: I have included all relevant information above
+          required: true

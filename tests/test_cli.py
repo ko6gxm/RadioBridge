@@ -57,8 +57,8 @@ class TestDownloadCommand:
         assert result.exit_code == 1
         assert "Error: Cannot specify both --county and --city" in result.output
 
-    @patch("ham_formatter.cli.download_repeater_data")
-    @patch("ham_formatter.cli.write_csv")
+    @patch("ham_formatter.cli.download_with_details")
+    @patch("ham_formatter.cli.write_csv_with_comments")
     def test_download_state_only(self, mock_write_csv, mock_download):
         """Test state-only download."""
         mock_download.return_value = self.sample_data
@@ -77,13 +77,19 @@ class TestDownloadCommand:
 
         assert result.exit_code == 0
         mock_download.assert_called_once_with(
-            state="CA", country="United States", bands=["all"]
+            state="CA",
+            country="United States",
+            bands=["all"],
+            rate_limit=1.0,
+            temp_dir=None,
+            nohammer=False,
+            debug=False,
         )
         mock_write_csv.assert_called_once()
         assert "Successfully downloaded 2 repeaters from CA" in result.output
 
-    @patch("ham_formatter.cli.download_repeater_data_by_county")
-    @patch("ham_formatter.cli.write_csv")
+    @patch("ham_formatter.cli.download_with_details_by_county")
+    @patch("ham_formatter.cli.write_csv_with_comments")
     def test_download_county(self, mock_write_csv, mock_download_county):
         """Test county download."""
         mock_download_county.return_value = self.sample_data
@@ -104,7 +110,14 @@ class TestDownloadCommand:
 
         assert result.exit_code == 0
         mock_download_county.assert_called_once_with(
-            state="CA", county="Los Angeles", country="United States", bands=["all"]
+            state="CA",
+            county="Los Angeles",
+            country="United States",
+            bands=["all"],
+            rate_limit=1.0,
+            temp_dir=None,
+            nohammer=False,
+            debug=False,
         )
         mock_write_csv.assert_called_once()
         assert (
@@ -112,8 +125,8 @@ class TestDownloadCommand:
             in result.output
         )
 
-    @patch("ham_formatter.cli.download_repeater_data_by_city")
-    @patch("ham_formatter.cli.write_csv")
+    @patch("ham_formatter.cli.download_with_details_by_city")
+    @patch("ham_formatter.cli.write_csv_with_comments")
     def test_download_city(self, mock_write_csv, mock_download_city):
         """Test city download."""
         mock_download_city.return_value = self.sample_data
@@ -134,12 +147,19 @@ class TestDownloadCommand:
 
         assert result.exit_code == 0
         mock_download_city.assert_called_once_with(
-            state="TX", city="Austin", country="United States", bands=["all"]
+            state="TX",
+            city="Austin",
+            country="United States",
+            bands=["all"],
+            rate_limit=1.0,
+            temp_dir=None,
+            nohammer=False,
+            debug=False,
         )
         mock_write_csv.assert_called_once()
         assert "Successfully downloaded 2 repeaters from Austin, TX" in result.output
 
-    @patch("ham_formatter.cli.download_repeater_data")
+    @patch("ham_formatter.cli.download_with_details")
     def test_download_auto_filename_state(self, mock_download):
         """Test automatic filename generation for state download."""
         mock_download.return_value = self.sample_data
@@ -160,7 +180,7 @@ class TestDownloadCommand:
             finally:
                 os.chdir(original_cwd)
 
-    @patch("ham_formatter.cli.download_repeater_data_by_county")
+    @patch("ham_formatter.cli.download_with_details_by_county")
     def test_download_auto_filename_county(self, mock_download_county):
         """Test automatic filename generation for county download."""
         mock_download_county.return_value = self.sample_data
@@ -182,7 +202,7 @@ class TestDownloadCommand:
             finally:
                 os.chdir(original_cwd)
 
-    @patch("ham_formatter.cli.download_repeater_data_by_city")
+    @patch("ham_formatter.cli.download_with_details_by_city")
     def test_download_auto_filename_city(self, mock_download_city):
         """Test automatic filename generation for city download."""
         mock_download_city.return_value = self.sample_data
@@ -204,8 +224,8 @@ class TestDownloadCommand:
             finally:
                 os.chdir(original_cwd)
 
-    @patch("ham_formatter.cli.write_csv")
-    @patch("ham_formatter.cli.download_repeater_data_by_county")
+    @patch("ham_formatter.cli.write_csv_with_comments")
+    @patch("ham_formatter.cli.download_with_details_by_county")
     def test_download_verbose_county(self, mock_download_county, mock_write_csv):
         """Test verbose output for county download."""
         mock_download_county.return_value = self.sample_data
@@ -227,11 +247,18 @@ class TestDownloadCommand:
 
         assert result.exit_code == 0
         mock_download_county.assert_called_once_with(
-            state="CA", county="Los Angeles", country="United States", bands=["all"]
+            state="CA",
+            county="Los Angeles",
+            country="United States",
+            bands=["all"],
+            rate_limit=1.0,
+            temp_dir=None,
+            nohammer=False,
+            debug=False,
         )
         mock_write_csv.assert_called_once()
 
-    @patch("ham_formatter.cli.download_repeater_data")
+    @patch("ham_formatter.cli.download_with_details")
     def test_download_error_handling(self, mock_download):
         """Test error handling in download command."""
         mock_download.side_effect = Exception("Test error")
@@ -243,7 +270,7 @@ class TestDownloadCommand:
 
     def test_download_country_parameter(self):
         """Test that country parameter is passed through correctly."""
-        with patch("ham_formatter.cli.download_repeater_data") as mock_download:
+        with patch("ham_formatter.cli.download_with_details") as mock_download:
             mock_download.return_value = self.sample_data
 
             with tempfile.TemporaryDirectory() as tmpdir:
@@ -262,11 +289,17 @@ class TestDownloadCommand:
 
             assert result.exit_code == 0
             mock_download.assert_called_once_with(
-                state="ON", country="Canada", bands=["all"]
+                state="ON",
+                country="Canada",
+                bands=["all"],
+                rate_limit=1.0,
+                temp_dir=None,
+                nohammer=False,
+                debug=False,
             )
 
     @patch("ham_formatter.cli.download_with_details")
-    @patch("ham_formatter.cli.write_csv")
+    @patch("ham_formatter.cli.write_csv_with_comments")
     def test_download_nohammer_with_detailed(self, mock_write_csv, mock_download):
         """Test nohammer functionality with detailed downloads."""
         mock_data = pd.DataFrame(
@@ -283,7 +316,6 @@ class TestDownloadCommand:
                     "CA",
                     "--band",
                     "2m",
-                    "--detailed",
                     "--nohammer",
                     "--output",
                     str(Path(tmpdir) / "test.csv"),
@@ -304,8 +336,8 @@ class TestDownloadCommand:
         )
         mock_write_csv.assert_called_once()
 
-    @patch("ham_formatter.cli.download_repeater_data")
-    @patch("ham_formatter.cli.write_csv")
+    @patch("ham_formatter.cli.download_with_details")
+    @patch("ham_formatter.cli.write_csv_with_comments")
     def test_download_nohammer_without_detailed(self, mock_write_csv, mock_download):
         """Test nohammer functionality without detailed downloads (should warn)."""
         mock_data = pd.DataFrame({"frequency": [145.200], "call": ["W6ABC"]})
@@ -328,15 +360,15 @@ class TestDownloadCommand:
 
         assert result.exit_code == 0
 
-        # Verify that warning about no effect is logged
-        assert (
-            "No-hammer mode has no effect without --detailed flag" in result.output
-            or True
-        )  # CLI doesn't echo warnings
-
-        # Verify standard download was called (not detailed)
+        # Verify detailed download was called (all downloads are now detailed)
         mock_download.assert_called_once_with(
-            state="CA", country="United States", bands=["2m"]
+            state="CA",
+            country="United States",
+            bands=["2m"],
+            rate_limit=1.0,
+            temp_dir=None,
+            nohammer=True,
+            debug=False,
         )
         mock_write_csv.assert_called_once()
 
@@ -388,3 +420,7 @@ class TestBackwardCompatibility:
         assert result.exit_code == 0
         mock_get_formatter.assert_called_once_with("anytone-878")
         mock_formatter.format.assert_called_once()
+
+
+# Static commands are not implemented in the current CLI
+# These tests would be for future functionality

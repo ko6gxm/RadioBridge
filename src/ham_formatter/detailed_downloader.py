@@ -20,7 +20,13 @@ from ham_formatter.logging_config import get_logger
 
 
 class DetailedRepeaterDownloader(RepeaterBookDownloader):
-    """Enhanced downloader that collects detailed repeater information."""
+    """Enhanced downloader that collects detailed repeater information.
+
+    This downloader extends the basic RepeaterBookDownloader to collect detailed
+    information from individual repeater pages. It handles band filtering while
+    preserving original DataFrame indices, requiring the use of .loc (label-based)
+    indexing instead of .iloc (position-based) to avoid out-of-bounds errors.
+    """
 
     def __init__(
         self,
@@ -82,8 +88,15 @@ class DetailedRepeaterDownloader(RepeaterBookDownloader):
                 self.logger.warning("No basic data found after filtering")
                 return basic_data
 
+            # Filter detail links to match the filtered basic data
+            filtered_detail_links = self._filter_detail_links_by_data(
+                detail_links, basic_data
+            )
+
             self.logger.info(f"Collected {len(basic_data)} basic repeater records")
-            self.logger.info(f"Found {len(detail_links)} detail page links to process")
+            self.logger.info(
+                f"Found {len(detail_links)} total detail links, {len(filtered_detail_links)} match filtered data"
+            )
 
             # Create temporary directory for this download session
             with tempfile.TemporaryDirectory(
@@ -98,7 +111,9 @@ class DetailedRepeaterDownloader(RepeaterBookDownloader):
                 self.logger.debug(f"Saved basic data to {basic_file}")
 
                 # Collect detailed data with progress tracking
-                detailed_data = self._collect_detailed_data(detail_links, session_dir)
+                detailed_data = self._collect_detailed_data(
+                    filtered_detail_links, session_dir
+                )
 
                 # Merge basic and detailed data
                 enhanced_data = self._merge_data(basic_data, detailed_data)
@@ -249,6 +264,33 @@ class DetailedRepeaterDownloader(RepeaterBookDownloader):
         self.logger.debug(f"Extracted {len(detail_links)} detail links")
         return detail_links
 
+    def _filter_detail_links_by_data(
+        self, detail_links: List[Dict[str, Any]], filtered_data: pd.DataFrame
+    ) -> List[Dict[str, Any]]:
+        """Filter detail links to only include those matching the filtered basic data.
+
+        Args:
+            detail_links: List of all detail links from the original scraping
+            filtered_data: DataFrame containing the filtered basic data
+
+        Returns:
+            List of detail links that correspond to rows in the filtered data
+        """
+        # Get the indices that remain after filtering
+        remaining_indices = set(filtered_data.index)
+
+        # Filter detail links to only include those whose row_index is in remaining_indices
+        filtered_links = [
+            link for link in detail_links if link["row_index"] in remaining_indices
+        ]
+
+        self.logger.debug(
+            f"Filtered detail links from {len(detail_links)} to {len(filtered_links)} "
+            f"based on filtered data indices: {sorted(remaining_indices)}"
+        )
+
+        return filtered_links
+
     def _collect_detailed_data(
         self, detail_links: List[Dict[str, Any]], session_dir: Path
     ) -> Dict[int, Dict[str, Any]]:
@@ -364,6 +406,11 @@ class DetailedRepeaterDownloader(RepeaterBookDownloader):
             if echolink_data:
                 detail_data.update(echolink_data)
 
+            # Extract IRLP information from HTML
+            irlp_data = self._extract_irlp_info(soup, detail_url)
+            if irlp_data:
+                detail_data.update(irlp_data)
+
             # Extract grid squares
             grid_matches = re.findall(r"[A-Z]{2}\d{2}[a-z]{2}", text)
             if grid_matches:
@@ -425,6 +472,205 @@ class DetailedRepeaterDownloader(RepeaterBookDownloader):
                 time.sleep(sleep_time)
 
         self.last_request_time = time.time()
+
+    def _extract_irlp_info(
+        self, soup: BeautifulSoup, detail_url: str
+    ) -> Dict[str, Any]:
+        """Extract IRLP information from repeater detail page.
+
+        Args:
+            soup: BeautifulSoup object of the detail page
+            detail_url: URL of the detail page for logging
+
+        Returns:
+            Dictionary with IRLP data including node status
+        """
+        irlp_data = {}
+
+        try:
+            # Look for IRLP in the HTML content
+            text = soup.get_text()
+
+            # Search for IRLP pattern in text
+            # Pattern: "IRLP: 3341 — IDLE for 0 days, 3 hours, 26 minutes, 46 seconds"
+            irlp_match = re.search(r"IRLP:\s*(\d+)([^\n]*)", text, re.IGNORECASE)
+            if irlp_match:
+                node_number = irlp_match.group(1)
+                status_text = irlp_match.group(2).strip()
+
+                irlp_data["irlp_node"] = node_number
+                if status_text:
+                    irlp_data["irlp_status_text"] = status_text
+
+                # Look for IRLP links in HTML
+                irlp_links = soup.find_all(
+                    "a", href=re.compile(r"irlp|status\.irlp\.net", re.IGNORECASE)
+                )
+
+                for link in irlp_links:
+                    href = link.get("href")
+                    if href and node_number in href:
+                        # Found IRLP status link
+                        irlp_url = (
+                            href
+                            if href.startswith("http")
+                            else urljoin("https://status.irlp.net/", href)
+                        )
+                        irlp_data["irlp_url"] = irlp_url
+
+                        # Fetch IRLP node status
+                        node_status = self._scrape_irlp_status(irlp_url, node_number)
+                        if node_status:
+                            irlp_data.update(node_status)
+                        break
+
+                if self.debug:
+                    self.logger.debug(
+                        f"IRLP found for {detail_url}: Node {node_number}"
+                    )
+                    if "irlp_url" in irlp_data:
+                        self.logger.debug(f"  Link: {irlp_data['irlp_url']}")
+                    if "irlp_node_status" in irlp_data:
+                        self.logger.debug(f"  Status: {irlp_data['irlp_node_status']}")
+
+        except Exception as e:
+            self.logger.debug(f"Error extracting IRLP info from {detail_url}: {e}")
+
+        return irlp_data
+
+    def _scrape_irlp_status(self, irlp_url: str, node_number: str) -> Dict[str, Any]:
+        """Scrape IRLP node status from IRLP website.
+
+        Args:
+            irlp_url: URL to the IRLP node status page
+            node_number: IRLP node number for validation
+
+        Returns:
+            Dictionary with IRLP node status information
+        """
+        status_data = {}
+
+        try:
+            # Apply rate limiting for external requests
+            self._apply_rate_limit()
+
+            self.logger.debug(f"Fetching IRLP status: {irlp_url}")
+            response = self.session.get(irlp_url, timeout=self.timeout)
+            response.raise_for_status()
+
+            soup = BeautifulSoup(response.content, "html.parser")
+            text = soup.get_text()
+
+            # Extract common IRLP status information
+            # Look for status indicators (IDLE, ONLINE, OFFLINE, CONNECTED, etc.)
+            status_indicators = [
+                (r"IDLE\s+for\s+([^\n]+)", "IDLE"),
+                (r"CONNECTED\s+to\s+([^\n]+)", "CONNECTED"),
+                (r"ONLINE\s+([^\n]*)", "ONLINE"),
+                (r"OFFLINE\s+([^\n]*)", "OFFLINE"),
+                (r"Status:\s*([^\n]+)", None),  # Generic status pattern
+            ]
+
+            for pattern, default_status in status_indicators:
+                status_match = re.search(pattern, text, re.IGNORECASE)
+                if status_match:
+                    status_info = status_match.group(1).strip()
+                    if default_status:
+                        status_data["irlp_node_status"] = default_status
+                        if status_info:
+                            status_data["irlp_status_detail"] = status_info
+                    else:
+                        status_data["irlp_node_status"] = status_info
+                    break
+
+            # If no specific status found, look for general online/offline indicators
+            if "irlp_node_status" not in status_data:
+                if "online" in text.lower():
+                    status_data["irlp_node_status"] = "Online"
+                elif "offline" in text.lower():
+                    status_data["irlp_node_status"] = "Offline"
+                elif "idle" in text.lower():
+                    status_data["irlp_node_status"] = "IDLE"
+                else:
+                    status_data["irlp_node_status"] = "Unknown"
+
+            # Look for callsign (more specific patterns)
+            callsign_patterns = [
+                r"Call:\s*([A-Z0-9]{3,8}(?:-[A-Z0-9]+)?)",  # "Call: W6ABC-R"
+                r"Callsign:\s*([A-Z0-9]{3,8}(?:-[A-Z0-9]+)?)",  # "Callsign: W6ABC-R"
+                r"([A-Z]{1,2}[0-9][A-Z]{1,3}(?:-[A-Z0-9]+)?)",  # General amateur radio callsign pattern
+            ]
+
+            for pattern in callsign_patterns:
+                callsign_match = re.search(pattern, text, re.IGNORECASE)
+                if callsign_match:
+                    callsign = callsign_match.group(1)
+                    # Validate that this looks like a callsign and not a node number
+                    if not callsign.isdigit() and len(callsign) >= 3:
+                        status_data["irlp_callsign"] = callsign
+                        break
+
+            # Look for location information
+            location_patterns = [
+                r"Location:\s*([^\n]+)",
+                r"QTH:\s*([^\n]+)",
+                r"City:\s*([^\n]+)",
+                r"Node\s+Location:\s*([^\n]+)",
+            ]
+            for pattern in location_patterns:
+                location_match = re.search(pattern, text, re.IGNORECASE)
+                if location_match:
+                    status_data["irlp_location"] = location_match.group(1).strip()
+                    break
+
+            # Look for last activity/connection information
+            activity_patterns = [
+                r"Last\s+Activity:\s*([^\n]+)",
+                r"Last\s+Connect:\s*([^\n]+)",
+                r"Last\s+Connection:\s*([^\n]+)",
+                r"Last\s+Heard:\s*([^\n]+)",
+            ]
+            for pattern in activity_patterns:
+                activity_match = re.search(pattern, text, re.IGNORECASE)
+                if activity_match:
+                    status_data["irlp_last_activity"] = activity_match.group(1).strip()
+                    break
+
+            # Look for node owner/trustee information
+            owner_patterns = [
+                r"Owner:\s*([^\n]+)",
+                r"Trustee:\s*([^\n]+)",
+                r"Contact:\s*([^\n]+)",
+            ]
+            for pattern in owner_patterns:
+                owner_match = re.search(pattern, text, re.IGNORECASE)
+                if owner_match:
+                    status_data["irlp_owner"] = owner_match.group(1).strip()
+                    break
+
+            # Look for node description/name
+            name_patterns = [
+                r"Node\s+Name:\s*([^\n]+)",
+                r"Description:\s*([^\n]+)",
+                r"Node\s+Description:\s*([^\n]+)",
+            ]
+            for pattern in name_patterns:
+                name_match = re.search(pattern, text, re.IGNORECASE)
+                if name_match:
+                    status_data["irlp_node_name"] = name_match.group(1).strip()
+                    break
+
+            if self.debug:
+                self.logger.debug(f"IRLP status data for node {node_number}:")
+                for key, value in status_data.items():
+                    self.logger.debug(f"  {key}: {value}")
+
+        except Exception as e:
+            self.logger.debug(f"Error fetching IRLP status from {irlp_url}: {e}")
+            status_data["irlp_node_status"] = "Error"
+            status_data["irlp_error"] = str(e)
+
+        return status_data
 
     def _extract_echolink_info(
         self, soup: BeautifulSoup, detail_url: str
@@ -599,23 +845,73 @@ class DetailedRepeaterDownloader(RepeaterBookDownloader):
             text: Page text to parse
             detail_data: Dictionary to store extracted data
         """
-        # Extract color code
-        color_code_match = re.search(r"DMR Color Code:\s*(\d+)", text)
-        if color_code_match:
-            detail_data["dmr_color_code"] = color_code_match.group(1)
+        # Extract color code with multiple patterns
+        color_code_patterns = [
+            r"DMR Color Code:\s*(\d+)",
+            r"Color Code:\s*(\d+)",
+            r"DMR\s+Color\s+Code:\s*(\d+)",
+            r"Color\s+Code\s*:\s*(\d+)",
+        ]
 
-        # Extract DMR ID (be specific to avoid matching "Repeater ID")
-        dmr_id_match = re.search(r"DMR\s+ID:\s*(\d+)", text)
-        if dmr_id_match:
-            detail_data["dmr_id"] = dmr_id_match.group(1)
+        for pattern in color_code_patterns:
+            color_code_match = re.search(pattern, text, re.IGNORECASE)
+            if color_code_match:
+                detail_data["dmr_color_code"] = color_code_match.group(1)
+                break
 
-        # Only mark as DMR repeater if it has BOTH color code AND DMR ID
-        # (actual operational DMR data, not just mention of DMR)
+        # Extract DMR ID with multiple patterns
+        dmr_id_patterns = [
+            r"DMR\s+ID:\s*(\d+)",  # "DMR ID: 310724"
+            r"DMR\s+ID\s+(\d+)",  # "DMR ID 310724" (no colon)
+            r"DMRID:\s*(\d+)",  # "DMRID: 310724"
+        ]
+
+        for pattern in dmr_id_patterns:
+            dmr_id_match = re.search(pattern, text, re.IGNORECASE)
+            if dmr_id_match:
+                detail_data["dmr_id"] = dmr_id_match.group(1)
+                break
+
+        # Check for DMR indicators in the text (to detect DMR even without numeric ID)
+        dmr_indicators = [
+            r"DMR\s+Color\s+Code",
+            r"DMR\s+Network",
+            r"DMR\s+ID",
+            r"Western\s+States\s+DMR",
+            r"Brandmeister",
+            r"IPSC",
+            r"DMR\s*-?\s*Marc",
+        ]
+
+        has_dmr_indicators = any(
+            re.search(pattern, text, re.IGNORECASE) for pattern in dmr_indicators
+        )
+
+        # Enhanced DMR detection logic
         has_color_code = "dmr_color_code" in detail_data
         has_dmr_id = "dmr_id" in detail_data
+        has_talkgroups = bool(detail_data.get("talkgroups"))
 
-        if has_color_code and has_dmr_id:
+        # DMR detection logic (more flexible):
+        # 1. Has DMR color code (strong indicator)
+        # 2. Has numeric DMR ID
+        # 3. Has talkgroups (DMR-specific)
+        # 4. Has DMR-related text indicators
+        if has_color_code or has_dmr_id or has_talkgroups or has_dmr_indicators:
             detail_data["is_dmr"] = "true"
+
+            # Debug logging for DMR detection
+            if self.debug:
+                reasons = []
+                if has_color_code:
+                    reasons.append(f"color_code={detail_data['dmr_color_code']}")
+                if has_dmr_id:
+                    reasons.append(f"dmr_id={detail_data['dmr_id']}")
+                if has_talkgroups:
+                    reasons.append("talkgroups")
+                if has_dmr_indicators:
+                    reasons.append("dmr_indicators")
+                self.logger.debug(f"DMR detected due to: {', '.join(reasons)}")
         else:
             detail_data["is_dmr"] = "false"
 
@@ -693,6 +989,12 @@ class DetailedRepeaterDownloader(RepeaterBookDownloader):
             "EchoLink Callsign",
             "EchoLink Location",
             "EchoLink Last Activity",
+            "IRLP",
+            "IRLP Node",
+            "IRLP Status",
+            "IRLP Last Activity",
+            "IRLP Callsign",
+            "IRLP Location",
             "Notes",
         ]
 
@@ -701,6 +1003,13 @@ class DetailedRepeaterDownloader(RepeaterBookDownloader):
 
         # Process each row
         for idx in basic_data.index:
+            # Check if the index exists in the basic data (defensive programming)
+            if idx not in basic_data.index:
+                self.logger.warning(
+                    f"Skipping index {idx} - not found in filtered basic data"
+                )
+                continue
+
             row_detail = detailed_data.get(idx, {})
 
             # Extract and map specific fields
@@ -709,11 +1018,12 @@ class DetailedRepeaterDownloader(RepeaterBookDownloader):
             structured_df.loc[idx, "Offset"] = row_detail.get("offset_mhz", "")
 
             # For tone data, we need to extract from basic data or detailed data
+            # Use .loc instead of .iloc to avoid out-of-bounds errors with filtered data
             structured_df.loc[idx, "Uplink Tone"] = self._get_tone_data(
-                basic_data.iloc[idx], row_detail, "up"
+                basic_data.loc[idx], row_detail, "up"
             )
             structured_df.loc[idx, "Downlink Tone"] = self._get_tone_data(
-                basic_data.iloc[idx], row_detail, "down"
+                basic_data.loc[idx], row_detail, "down"
             )
 
             # DMR information
@@ -729,23 +1039,24 @@ class DetailedRepeaterDownloader(RepeaterBookDownloader):
             structured_df.loc[idx, "WIRES‑X"] = self._extract_wires_x(row_detail)
 
             # Basic information (from basic data with detail fallback)
+            # Use .loc instead of .iloc to avoid out-of-bounds errors with filtered data
             structured_df.loc[idx, "County"] = row_detail.get(
-                "county", basic_data.iloc[idx].get("county", "")
+                "county", basic_data.loc[idx].get("county", "")
             )
             structured_df.loc[idx, "Grid Square"] = self._extract_grid_square(
                 row_detail
             )
             structured_df.loc[idx, "Call"] = row_detail.get(
                 "call",
-                basic_data.iloc[idx].get(
-                    "call", basic_data.iloc[idx].get("callsign", "")
+                basic_data.loc[idx].get(
+                    "call", basic_data.loc[idx].get("callsign", "")
                 ),
             )
             structured_df.loc[idx, "Use"] = row_detail.get(
-                "use", basic_data.iloc[idx].get("use", "")
+                "use", basic_data.loc[idx].get("use", "")
             )
             structured_df.loc[idx, "Status"] = row_detail.get(
-                "status", basic_data.iloc[idx].get("status", "")
+                "status", basic_data.loc[idx].get("status", "")
             )
 
             # Sponsor and coordination info
@@ -778,9 +1089,26 @@ class DetailedRepeaterDownloader(RepeaterBookDownloader):
                 "echolink_last_activity", ""
             )
 
+            # IRLP information
+            structured_df.loc[idx, "IRLP"] = row_detail.get("irlp_node", "")
+            structured_df.loc[idx, "IRLP Node"] = row_detail.get("irlp_node", "")
+            structured_df.loc[idx, "IRLP Status"] = row_detail.get(
+                "irlp_node_status", ""
+            )
+            structured_df.loc[idx, "IRLP Last Activity"] = row_detail.get(
+                "irlp_last_activity", ""
+            )
+            structured_df.loc[idx, "IRLP Callsign"] = row_detail.get(
+                "irlp_callsign", ""
+            )
+            structured_df.loc[idx, "IRLP Location"] = row_detail.get(
+                "irlp_location", ""
+            )
+
             # Consolidate remaining data into notes
+            # Use .loc instead of .iloc to avoid out-of-bounds errors with filtered data
             structured_df.loc[idx, "Notes"] = self._create_notes_field(
-                basic_data.iloc[idx], row_detail, target_columns
+                basic_data.loc[idx], row_detail, target_columns
             )
 
         return structured_df
@@ -894,6 +1222,20 @@ class DetailedRepeaterDownloader(RepeaterBookDownloader):
             "echolink_callsign",
             "echolink_location",
             "echolink_last_activity",
+            "echolink_status_text",
+            "echolink_url",
+            "echolink_error",
+            "irlp_node",
+            "irlp_node_status",
+            "irlp_callsign",
+            "irlp_location",
+            "irlp_last_activity",
+            "irlp_status_text",
+            "irlp_status_detail",
+            "irlp_url",
+            "irlp_error",
+            "irlp_owner",
+            "irlp_node_name",
             "grid_squares",
             "talkgroups",
             "ts1_talkgroups",

@@ -1,6 +1,6 @@
 """Formatter for Baofeng DM-32UV handheld radio."""
 
-from typing import List
+from typing import Dict, List, Optional
 
 import pandas as pd
 
@@ -37,7 +37,9 @@ class BaofengDM32UVFormatter(BaseRadioFormatter):
     @property
     def required_columns(self) -> List[str]:
         """List of column names required in the input data."""
-        return ["frequency"]
+        # Accept both basic downloader format (frequency) and detailed format (Downlink)
+        # The formatter will handle both formats
+        return []
 
     @property
     def output_columns(self) -> List[str]:
@@ -107,28 +109,21 @@ class BaofengDM32UVFormatter(BaseRadioFormatter):
         for idx, row in data.iterrows():
             channel = idx + start_channel
 
-            rx_freq = self.clean_frequency(row.get("frequency"))
+            # Map download data fields to radio fields
+            # Detailed downloader: Downlink -> RX Frequency[MHz]
+            # Basic downloader: frequency -> RX Frequency[MHz]
+            rx_freq = self._get_rx_frequency(row)
             if not rx_freq:
-                self.logger.debug(
-                    f"Skipping row {idx}: invalid frequency {row.get('frequency')}"
-                )
+                self.logger.debug(f"Skipping row {idx}: no valid RX frequency found")
                 continue
 
-            # Calculate TX frequency from offset
-            offset = self.clean_offset(self.get_offset_value(row))
-            if offset and offset != "0.000000":
-                try:
-                    rx_float = float(rx_freq)
-                    offset_float = float(offset)
-                    tx_freq = f"{rx_float + offset_float:.5f}"
-                except (ValueError, TypeError):
-                    tx_freq = rx_freq
-            else:
-                tx_freq = rx_freq
+            # Map download data fields to radio fields
+            # Detailed downloader: Uplink -> TX Frequency[MHz]
+            # Basic downloader: calculated from frequency + offset
+            tx_freq = self._get_tx_frequency(row, rx_freq)
 
-            # Get tone information (supports both new tone_up/tone_down and
-            # legacy tone columns)
-            tone_up, tone_down = self.get_tone_values(row)
+            # Map tone fields: Uplink Tone -> encode, Downlink Tone -> decode
+            tone_up, tone_down = self._get_tone_values(row)
 
             # Generate channel name using base class helper
             channel_name = self.build_channel_name(row, max_length=16, location_slice=8)
@@ -137,17 +132,8 @@ class BaofengDM32UVFormatter(BaseRadioFormatter):
 
             channel_names.append(channel_name)
 
-            # Determine if this is a digital repeater (DMR)
-            # Check for DMR indicators in the data
-            is_dmr = False
-            for field in ["mode", "type", "service"]:
-                field_value = str(row.get(field, "")).lower()
-                if any(
-                    keyword in field_value
-                    for keyword in ["dmr", "digital", "d-star", "fusion"]
-                ):
-                    is_dmr = True
-                    break
+            # Map DMR field: detailed downloader provides DMR column directly
+            is_dmr = self._is_dmr_repeater(row)
 
             # Set channel type
             channel_type = "Digital" if is_dmr else "Analog"
@@ -187,7 +173,7 @@ class BaofengDM32UVFormatter(BaseRadioFormatter):
                 "Digital APRS PTT Mode": "0",
                 "TX Contact": "None" if not is_dmr else "None",
                 "RX Group List": "None" if not is_dmr else "None",
-                "Color Code": "1" if is_dmr else "0",
+                "Color Code": self._get_color_code(row, is_dmr),
                 "Time Slot": "Slot 1" if is_dmr else "Slot 1",
                 "Encryption": "0",
                 "Encryption ID": "None",
@@ -195,7 +181,7 @@ class BaofengDM32UVFormatter(BaseRadioFormatter):
                 "Direct Dual Mode": "0",
                 "Private Confirm": "0",
                 "Short Data Confirm": "0",
-                "DMR ID": self.get_callsign(row) or "None",
+                "DMR ID": self._get_dmr_id(row),
                 "CTC/DCS Decode": ctc_decode,
                 "CTC/DCS Encode": ctc_encode,
                 "Scramble": "None",
@@ -230,3 +216,373 @@ class BaofengDM32UVFormatter(BaseRadioFormatter):
             f"Format operation complete: {len(result_df)} channels formatted"
         )
         return result_df
+
+    def format_zones(
+        self,
+        formatted_data: pd.DataFrame,
+        csv_metadata: Optional[Dict[str, str]] = None,
+        zone_strategy: str = "location",
+        max_zones: int = 250,
+        max_channels_per_zone: int = 64,
+    ) -> pd.DataFrame:
+        """Format zone data for Baofeng DM-32UV.
+
+        Creates zones in the format: No., Zone Name, Channel Members
+        where Channel Members are pipe-separated channel names.
+
+        Args:
+            formatted_data: DataFrame with formatted channel information
+            csv_metadata: Metadata from CSV comments (contains county, state, city, etc.)
+            zone_strategy: Strategy for creating zones ('location', 'band', 'service')
+            max_zones: Maximum number of zones to create
+            max_channels_per_zone: Maximum channels per zone
+
+        Returns:
+            Formatted DataFrame with zone information
+        """
+        self.logger.info(f"Creating zones using strategy: {zone_strategy}")
+
+        zones_data = []
+        zone_num = 1  # Start at 1 as expected by radio
+
+        if zone_strategy == "location":
+            # Get zone name from CSV metadata
+            zone_name = self._get_zone_name_from_metadata(
+                csv_metadata, zone_strategy, max_length=16
+            )
+
+            # Collect all channel names
+            channel_names = []
+            for _, row in formatted_data.iterrows():
+                channel_name = row.get("Channel Name", f"CH{row.get('No.', 0)}")
+                channel_names.append(str(channel_name))
+
+            # Split into groups if too many channels
+            if len(channel_names) <= max_channels_per_zone:
+                # Single zone
+                channel_members = "|".join(channel_names)
+                zones_data.append(
+                    {
+                        "No.": zone_num,
+                        "Zone Name": zone_name,
+                        "Channel Members": channel_members,
+                    }
+                )
+            else:
+                # Multiple zones
+                for i in range(0, len(channel_names), max_channels_per_zone):
+                    if zone_num > max_zones:
+                        break
+
+                    group_channels = channel_names[i : i + max_channels_per_zone]
+                    group_name = f"{zone_name}{zone_num}"  # e.g., "Riverside CA1", "Riverside CA2"
+                    channel_members = "|".join(group_channels)
+
+                    zones_data.append(
+                        {
+                            "No.": zone_num,
+                            "Zone Name": group_name[:16],  # Truncate to 16 chars
+                            "Channel Members": channel_members,
+                        }
+                    )
+                    zone_num += 1
+
+        elif zone_strategy == "band":
+            # Group by frequency band
+            vhf_channels = []
+            uhf_channels = []
+
+            for _, row in formatted_data.iterrows():
+                channel_name = row.get("Channel Name", f"CH{row.get('No.', 0)}")
+                rx_freq_str = row.get("RX Frequency[MHz]", "0")
+
+                try:
+                    freq = float(rx_freq_str)
+                    if 136.0 <= freq <= 174.0:  # VHF
+                        vhf_channels.append(str(channel_name))
+                    elif 400.0 <= freq <= 520.0:  # UHF
+                        uhf_channels.append(str(channel_name))
+                except (ValueError, TypeError):
+                    pass
+
+            # Create VHF zone
+            if vhf_channels and zone_num <= max_zones:
+                channel_members = "|".join(vhf_channels[:max_channels_per_zone])
+                zones_data.append(
+                    {
+                        "No.": zone_num,
+                        "Zone Name": "VHF",
+                        "Channel Members": channel_members,
+                    }
+                )
+                zone_num += 1
+
+            # Create UHF zone
+            if uhf_channels and zone_num <= max_zones:
+                channel_members = "|".join(uhf_channels[:max_channels_per_zone])
+                zones_data.append(
+                    {
+                        "No.": zone_num,
+                        "Zone Name": "UHF",
+                        "Channel Members": channel_members,
+                    }
+                )
+                zone_num += 1
+
+        else:
+            # Default: create single zone with all channels
+            zone_name = self._get_zone_name_from_metadata(
+                csv_metadata, "location", max_length=16
+            )
+            # Don't use "All Channels" - keep the location-based name
+            if zone_name == "Unknown":
+                zone_name = "Mixed"
+
+            channel_names = []
+            for _, row in formatted_data.iterrows():
+                channel_name = row.get("Channel Name", f"CH{row.get('No.', 0)}")
+                channel_names.append(str(channel_name))
+
+            channel_members = "|".join(channel_names[:max_channels_per_zone])
+            zones_data.append(
+                {
+                    "No.": zone_num,
+                    "Zone Name": zone_name[:16],
+                    "Channel Members": channel_members,
+                }
+            )
+
+        if not zones_data:
+            # Fallback: create default zone
+            zones_data.append({"No.": 1, "Zone Name": "Default", "Channel Members": ""})
+
+        result_df = pd.DataFrame(zones_data)
+        self.logger.info(
+            f"Created {len(result_df)} zones using {zone_strategy} strategy"
+        )
+        return result_df
+
+    def _get_rx_frequency(self, row: pd.Series) -> Optional[str]:
+        """Get RX frequency from row data, handling both basic and detailed formats.
+
+        Args:
+            row: Row data from DataFrame
+
+        Returns:
+            Cleaned RX frequency string or None if invalid
+        """
+        # Try detailed downloader format first: Downlink -> RX Frequency[MHz]
+        if (
+            "Downlink" in row
+            and pd.notna(row["Downlink"])
+            and str(row["Downlink"]).strip()
+        ):
+            return self.clean_frequency(row["Downlink"])
+
+        # Try basic downloader format: frequency -> RX Frequency[MHz]
+        if (
+            "frequency" in row
+            and pd.notna(row["frequency"])
+            and str(row["frequency"]).strip()
+        ):
+            return self.clean_frequency(row["frequency"])
+
+        # Try alternative column names
+        for col in ["rx_freq", "receive_frequency", "downlink_freq"]:
+            if col in row and pd.notna(row[col]) and str(row[col]).strip():
+                return self.clean_frequency(row[col])
+
+        return None
+
+    def _get_tx_frequency(self, row: pd.Series, rx_freq: str) -> str:
+        """Get TX frequency from row data, handling both basic and detailed formats.
+
+        Args:
+            row: Row data from DataFrame
+            rx_freq: RX frequency for fallback calculation
+
+        Returns:
+            TX frequency string
+        """
+        # Try detailed downloader format first: Uplink -> TX Frequency[MHz]
+        if "Uplink" in row and pd.notna(row["Uplink"]) and str(row["Uplink"]).strip():
+            tx_freq = self.clean_frequency(row["Uplink"])
+            if tx_freq:
+                return tx_freq
+
+        # Try direct TX frequency fields
+        for col in ["tx_freq", "transmit_frequency", "uplink_freq"]:
+            if col in row and pd.notna(row[col]) and str(row[col]).strip():
+                tx_freq = self.clean_frequency(row[col])
+                if tx_freq:
+                    return tx_freq
+
+        # Calculate from offset (basic downloader format or detailed format with Offset)
+        offset = None
+        if "Offset" in row and pd.notna(row["Offset"]) and str(row["Offset"]).strip():
+            offset = self.clean_offset(row["Offset"])
+        elif "offset" in row and pd.notna(row["offset"]) and str(row["offset"]).strip():
+            offset = self.clean_offset(row["offset"])
+
+        if offset and offset != "0.000000":
+            try:
+                rx_float = float(rx_freq)
+                offset_float = float(offset)
+                return f"{rx_float + offset_float:.5f}"
+            except (ValueError, TypeError):
+                pass
+
+        # Fallback: same as RX frequency (simplex)
+        return rx_freq
+
+    def _get_tone_values(self, row: pd.Series) -> tuple[Optional[str], Optional[str]]:
+        """Get tone values from row data, handling both basic and detailed formats.
+
+        Args:
+            row: Row data from DataFrame
+
+        Returns:
+            Tuple of (tone_up/encode, tone_down/decode)
+        """
+        # Try detailed downloader format first
+        tone_up = None
+        tone_down = None
+
+        # Uplink Tone -> encode (TX tone)
+        if (
+            "Uplink Tone" in row
+            and pd.notna(row["Uplink Tone"])
+            and str(row["Uplink Tone"]).strip()
+        ):
+            tone_up = self.clean_tone(row["Uplink Tone"])
+        elif (
+            "tone_up" in row
+            and pd.notna(row["tone_up"])
+            and str(row["tone_up"]).strip()
+        ):
+            tone_up = self.clean_tone(row["tone_up"])
+
+        # Downlink Tone -> decode (RX tone)
+        if (
+            "Downlink Tone" in row
+            and pd.notna(row["Downlink Tone"])
+            and str(row["Downlink Tone"]).strip()
+        ):
+            tone_down = self.clean_tone(row["Downlink Tone"])
+        elif (
+            "tone_down" in row
+            and pd.notna(row["tone_down"])
+            and str(row["tone_down"]).strip()
+        ):
+            tone_down = self.clean_tone(row["tone_down"])
+
+        # Fallback to legacy single tone field (use for both encode and decode)
+        if not tone_up and not tone_down:
+            if "tone" in row and pd.notna(row["tone"]) and str(row["tone"]).strip():
+                legacy_tone = self.clean_tone(row["tone"])
+                if legacy_tone:
+                    tone_up = tone_down = legacy_tone
+
+        return tone_up, tone_down
+
+    def _is_dmr_repeater(self, row: pd.Series) -> bool:
+        """Determine if this is a DMR repeater from row data.
+
+        Args:
+            row: Row data from DataFrame
+
+        Returns:
+            True if this appears to be a DMR repeater
+        """
+        # Check detailed downloader DMR field first
+        if "DMR" in row and pd.notna(row["DMR"]):
+            dmr_value = str(row["DMR"]).lower().strip()
+            return dmr_value in ["true", "1", "yes", "on"]
+
+        # Check for Color Code (DMR indicator)
+        if "Color Code" in row and pd.notna(row["Color Code"]):
+            try:
+                color_code = int(str(row["Color Code"]).strip())
+                return 0 <= color_code <= 15
+            except (ValueError, TypeError):
+                pass
+
+        # Check for DMR ID
+        if "DMR ID" in row and pd.notna(row["DMR ID"]):
+            dmr_id = str(row["DMR ID"]).strip()
+            return dmr_id.isdigit() and len(dmr_id) >= 3
+
+        # Check legacy fields for DMR indicators
+        for field in ["mode", "type", "service"]:
+            if field in row and pd.notna(row[field]):
+                field_value = str(row[field]).lower()
+                if any(
+                    keyword in field_value for keyword in ["dmr", "digital", "mototrbo"]
+                ):
+                    return True
+
+        return False
+
+    def _get_color_code(self, row: pd.Series, is_dmr: bool) -> str:
+        """Get DMR color code from row data.
+
+        Args:
+            row: Row data from DataFrame
+            is_dmr: Whether this is a DMR repeater
+
+        Returns:
+            Color code string
+        """
+        if not is_dmr:
+            return "0"
+
+        # Try detailed downloader Color Code field
+        if "Color Code" in row and pd.notna(row["Color Code"]):
+            try:
+                color_code = int(str(row["Color Code"]).strip())
+                if 0 <= color_code <= 15:
+                    return str(color_code)
+            except (ValueError, TypeError):
+                pass
+
+        # Try alternative field names
+        for col in ["color_code", "cc", "dmr_color_code"]:
+            if col in row and pd.notna(row[col]):
+                try:
+                    color_code = int(str(row[col]).strip())
+                    if 0 <= color_code <= 15:
+                        return str(color_code)
+                except (ValueError, TypeError):
+                    pass
+
+        # Default color code for DMR
+        return "1"
+
+    def _get_dmr_id(self, row: pd.Series) -> str:
+        """Get DMR ID from row data.
+
+        Args:
+            row: Row data from DataFrame
+
+        Returns:
+            DMR ID string or 'None'
+        """
+        # Try detailed downloader DMR ID field
+        if "DMR ID" in row and pd.notna(row["DMR ID"]):
+            dmr_id = str(row["DMR ID"]).strip()
+            if dmr_id.isdigit() and len(dmr_id) >= 3:
+                return dmr_id
+
+        # Try alternative field names
+        for col in ["dmr_id", "radio_id", "id"]:
+            if col in row and pd.notna(row[col]):
+                dmr_id = str(row[col]).strip()
+                if dmr_id.isdigit() and len(dmr_id) >= 3:
+                    return dmr_id
+
+        # Try to use callsign as fallback (not ideal but sometimes used)
+        callsign = self.get_callsign(row)
+        if callsign and callsign != "None":
+            return callsign
+
+        return "None"

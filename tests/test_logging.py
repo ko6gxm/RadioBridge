@@ -117,7 +117,7 @@ class TestCLILogging:
         """Test that download command generates appropriate log messages."""
         with caplog.at_level(logging.INFO):
             # Use mock to avoid actual HTTP requests
-            with patch("ham_formatter.cli.download_repeater_data") as mock_download:
+            with patch("ham_formatter.cli.download_with_details") as mock_download:
                 with patch("ham_formatter.cli.write_csv"):
                     # Create a proper pandas DataFrame mock
                     import pandas as pd
@@ -564,7 +564,7 @@ class TestFormatterLogging:
                 record.message
                 for record in caplog.records
                 if "Skipping row" in record.message
-                and "invalid frequency" in record.message
+                and "no valid frequency" in record.message
             ]
             assert len(skip_logs) >= 2  # At least 2 invalid frequencies
 
@@ -588,7 +588,9 @@ class TestFormatterLogging:
                 }
             )
 
-            with pytest.raises(ValueError, match="Missing required columns"):
+            with pytest.raises(
+                ValueError, match="No valid repeater data found after formatting"
+            ):
                 formatter.format(invalid_data)
 
             # Should log validation details
@@ -600,7 +602,7 @@ class TestFormatterLogging:
             error_logs = [
                 record.message
                 for record in caplog.records
-                if "Missing required columns" in record.message
+                if "No valid repeater data found after formatting" in record.message
             ]
 
             assert len(validation_logs) > 0

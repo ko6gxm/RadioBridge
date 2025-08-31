@@ -1,0 +1,253 @@
+name: CI/CD Pipeline 🚀
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  test:
+    name: Test Suite
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ["3.9", "3.10", "3.11", "3.12", "3.13"]
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Install pipenv
+      run: |
+        python -m pip install --upgrade pip
+        python -m pip install pipenv
+
+    - name: Cache dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.local/share/virtualenvs
+        key: ${{ runner.os }}-python-${{ matrix.python-version }}-pipenv-${{ hashFiles('**/Pipfile.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-python-${{ matrix.python-version }}-pipenv-
+
+    - name: Install dependencies
+      run: |
+        pipenv install --dev --deploy
+
+    - name: Install package
+      run: |
+        pipenv run pip install -e .
+
+    - name: Lint with flake8
+      run: |
+        pipenv run flake8 src/ tests/ --count --select=E9,F63,F7,F82 --show-source --statistics
+        pipenv run flake8 src/ tests/ --count --exit-zero --max-complexity=10 --max-line-length=88 --statistics
+
+    - name: Check formatting with Black
+      run: |
+        pipenv run black --check src/ tests/
+
+    - name: Run tests
+      run: |
+        pipenv run pytest --cov=ham_formatter --cov-report=xml --cov-report=term-missing
+
+    - name: Upload coverage to Codecov
+      if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.11'
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage.xml
+        flags: unittests
+        name: codecov-umbrella
+        fail_ci_if_error: false
+        verbose: true
+
+  integration-test:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    needs: test
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.11"
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip pipenv
+        pipenv install --dev --deploy
+        pipenv run pip install -e .
+
+    - name: Test CLI installation
+      run: |
+        pipenv run ham-formatter --version
+        pipenv run ham-formatter --help
+
+    - name: Test basic functionality
+      run: |
+        pipenv run ham-formatter list-radios
+
+    # Note: We avoid actual downloads in CI to respect RepeaterBook servers
+    - name: Test CLI help system
+      run: |
+        pipenv run ham-formatter download --help
+        pipenv run ham-formatter format --help
+
+  build:
+    name: Build Distribution
+    runs-on: ubuntu-latest
+    needs: test
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.11"
+
+    - name: Install build dependencies
+      run: |
+        python -m pip install --upgrade pip build twine
+
+    - name: Build package
+      run: |
+        python -m build
+
+    - name: Check distribution
+      run: |
+        python -m twine check dist/*
+
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: dist-files
+        path: dist/
+
+  security:
+    name: Security Scan
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.11"
+
+    - name: Install security tools
+      run: |
+        python -m pip install --upgrade pip
+        python -m pip install safety bandit[toml]
+
+    - name: Run safety check
+      run: |
+        python -m safety check --json
+
+    - name: Run bandit security scan
+      run: |
+        python -m bandit -r src/ -f json
+
+  performance:
+    name: Performance Tests
+    runs-on: ubuntu-latest
+    needs: test
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.11"
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip pipenv
+        pipenv install --dev --deploy
+        pipenv run pip install -e .
+
+    - name: Run performance tests
+      run: |
+        # Test memory usage and speed with sample data
+        pipenv run python -c "
+        import time
+        import psutil
+        import pandas as pd
+        from ham_formatter.radios import get_radio_formatter
+
+        # Create large sample dataset
+        data = pd.DataFrame({
+            'frequency': ['146.520'] * 1000,
+            'callsign': ['TEST'] * 1000,
+            'location': ['Test City'] * 1000
+        })
+
+        # Test each formatter
+        for radio in ['anytone-878', 'anytone-578', 'baofeng-dm32uv', 'baofeng-k5']:
+            formatter = get_radio_formatter(radio)
+
+            start_time = time.time()
+            start_memory = psutil.Process().memory_info().rss / 1024 / 1024
+
+            result = formatter.format(data)
+
+            end_time = time.time()
+            end_memory = psutil.Process().memory_info().rss / 1024 / 1024
+
+            print(f'{radio}: {end_time - start_time:.2f}s, {end_memory - start_memory:.1f}MB')
+            assert len(result) == 1000, f'{radio} failed to process all rows'
+
+        print('Performance tests passed!')
+        "
+
+  docs:
+    name: Documentation Check
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Check documentation
+      run: |
+        # Check that key documentation files exist
+        test -f README.md
+        test -f CHANGELOG.md
+        test -f CONTRIBUTING.md
+        test -f LICENSE
+
+        # Check for basic content
+        grep -q "Craig.*KO6GXM" README.md
+        grep -q "ko6gxm.com" README.md
+        grep -q "craig@ko6gxm.com" README.md
+
+        echo "Documentation checks passed!"
+
+    - name: Validate links in documentation
+      run: |
+        # Basic check for common URL patterns
+        grep -E "https?://[^\s]+" README.md | head -10
+
+        # Check for placeholder URLs
+        if grep -q "example.com\|placeholder\|YOUR_" README.md CONTRIBUTING.md; then
+          echo "Found placeholder URLs in documentation"
+          exit 1
+        fi
+
+        echo "Link validation passed!"

@@ -13,6 +13,11 @@ from ham_formatter.downloader import (
     download_repeater_data_by_county,
     download_repeater_data_by_city,
 )
+from ham_formatter.detailed_downloader import (
+    download_with_details,
+    download_with_details_by_county,
+    download_with_details_by_city,
+)
 
 
 class TestRepeaterBookDownloader:
@@ -204,56 +209,94 @@ class TestRepeaterBookDownloader:
 class TestConvenienceFunctions:
     """Test top-level convenience functions."""
 
-    @patch("ham_formatter.downloader.RepeaterBookDownloader")
-    def test_download_repeater_data_by_county(self, mock_downloader_class):
+    @patch("ham_formatter.detailed_downloader.DetailedRepeaterDownloader")
+    def test_download_with_details_by_county(self, mock_downloader_class):
         """Test county download convenience function."""
         mock_downloader = Mock()
-        mock_downloader.download_by_county.return_value = pd.DataFrame(
+        mock_downloader.download_with_details.return_value = pd.DataFrame(
             {"test": [1, 2, 3]}
         )
         mock_downloader_class.return_value = mock_downloader
 
-        result = download_repeater_data_by_county(
-            "CA", "Los Angeles", "United States", 30
+        result = download_with_details_by_county(
+            "CA",
+            "Los Angeles",
+            "United States",
+            bands=None,
+            rate_limit=1.5,
+            temp_dir=None,
+            nohammer=False,
+            debug=False,
         )
 
-        mock_downloader_class.assert_called_once_with(timeout=30)
-        mock_downloader.download_by_county.assert_called_once_with(
-            "CA", "Los Angeles", "United States", None
+        mock_downloader_class.assert_called_once_with(
+            rate_limit=1.5, temp_dir=None, nohammer=False, debug=False
+        )
+        mock_downloader.download_with_details.assert_called_once_with(
+            level="county",
+            state="CA",
+            county="Los Angeles",
+            country="United States",
+            bands=["all"],
         )
         assert isinstance(result, pd.DataFrame)
 
-    @patch("ham_formatter.downloader.RepeaterBookDownloader")
-    def test_download_repeater_data_by_city(self, mock_downloader_class):
+    @patch("ham_formatter.detailed_downloader.DetailedRepeaterDownloader")
+    def test_download_with_details_by_city(self, mock_downloader_class):
         """Test city download convenience function."""
         mock_downloader = Mock()
-        mock_downloader.download_by_city.return_value = pd.DataFrame(
+        mock_downloader.download_with_details.return_value = pd.DataFrame(
             {"test": [1, 2, 3]}
         )
         mock_downloader_class.return_value = mock_downloader
 
-        result = download_repeater_data_by_city("TX", "Austin", "United States", 30)
+        result = download_with_details_by_city(
+            "TX",
+            "Austin",
+            "United States",
+            bands=None,
+            rate_limit=1.5,
+            temp_dir=None,
+            nohammer=False,
+            debug=False,
+        )
 
-        mock_downloader_class.assert_called_once_with(timeout=30)
-        mock_downloader.download_by_city.assert_called_once_with(
-            "TX", "Austin", "United States", None
+        mock_downloader_class.assert_called_once_with(
+            rate_limit=1.5, temp_dir=None, nohammer=False, debug=False
+        )
+        mock_downloader.download_with_details.assert_called_once_with(
+            level="city",
+            state="TX",
+            city="Austin",
+            country="United States",
+            bands=["all"],
         )
         assert isinstance(result, pd.DataFrame)
 
-    @patch("ham_formatter.downloader.RepeaterBookDownloader")
+    @patch("ham_formatter.detailed_downloader.DetailedRepeaterDownloader")
     def test_original_download_function_still_works(self, mock_downloader_class):
         """Test that original download function is unchanged."""
         mock_downloader = Mock()
-        mock_downloader.download_by_state.return_value = pd.DataFrame(
+        mock_downloader.download_with_details.return_value = pd.DataFrame(
             {"test": [1, 2, 3]}
         )
         mock_downloader_class.return_value = mock_downloader
 
-        result = download_repeater_data("CA", "United States", 30)
+        result = download_with_details(
+            "CA",
+            "United States",
+            bands=None,
+            rate_limit=1.5,
+            temp_dir=None,
+            nohammer=False,
+            debug=False,
+        )
 
-        mock_downloader_class.assert_called_once_with(timeout=30)
-        mock_downloader.download_by_state.assert_called_once_with(
-            "CA", "United States", None
+        mock_downloader_class.assert_called_once_with(
+            rate_limit=1.5, temp_dir=None, nohammer=False, debug=False
+        )
+        mock_downloader.download_with_details.assert_called_once_with(
+            level="state", state="CA", country="United States", bands=["all"]
         )
         assert isinstance(result, pd.DataFrame)
 

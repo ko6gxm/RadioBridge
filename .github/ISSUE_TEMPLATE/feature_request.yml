@@ -1,0 +1,113 @@
+name: Feature Request ✨
+description: Suggest a new feature or improvement for Ham Formatter
+title: "[FEATURE] "
+labels: ["enhancement", "triage"]
+assignees:
+  - ko6gxm
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting a new feature! Community input helps drive Ham Formatter's development.
+
+        Please search existing issues first to see if your idea has been discussed.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or Use Case
+      description: What problem would this feature solve? What use case does it address?
+      placeholder: "As an amateur radio operator, I need... because..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed Solution
+      description: What would you like to see added or changed?
+      placeholder: "I would like Ham Formatter to..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives Considered
+      description: Have you considered alternative solutions or workarounds?
+      placeholder: "I considered... but it doesn't work because..."
+
+  - type: dropdown
+    id: feature_type
+    attributes:
+      label: Feature Type
+      options:
+        - New radio model support
+        - CLI improvement
+        - Data download enhancement
+        - Output formatting option
+        - Performance improvement
+        - Documentation
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: radio_model
+    attributes:
+      label: Radio Model (if applicable)
+      description: If requesting radio support, which model?
+      placeholder: "e.g., Yaesu FT-991A, Icom IC-7300"
+
+  - type: textarea
+    id: examples
+    attributes:
+      label: Usage Examples
+      description: How would this feature be used? Provide specific examples.
+      placeholder: |
+        # Example usage:
+        ham-formatter download --feature new-option
+
+        # Expected output:
+        ...
+
+  - type: dropdown
+    id: complexity
+    attributes:
+      label: Implementation Complexity
+      description: How complex do you think this would be to implement?
+      options:
+        - "Low (minor change)"
+        - "Medium (moderate effort)"
+        - "High (significant work)"
+        - "I'm not sure"
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      description: How important is this feature to you and the community?
+      options:
+        - "Nice to have"
+        - "Would be very helpful"
+        - "Critical for my use case"
+        - "Blocking other work"
+
+  - type: textarea
+    id: additional_context
+    attributes:
+      label: Additional Context
+      description: Add any other context, screenshots, or examples here.
+
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Checklist
+      options:
+        - label: I have searched existing issues for similar requests
+          required: true
+        - label: This feature would benefit multiple users, not just my specific case
+          required: true
+        - label: I have provided clear examples of how this would be used
+          required: true

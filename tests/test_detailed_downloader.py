@@ -191,6 +191,12 @@ class TestDetailedRepeaterDownloader:
             "Call",
             "Sponsor",
             "Grid Square",
+            "IRLP",
+            "IRLP Node",
+            "IRLP Status",
+            "IRLP Last Activity",
+            "IRLP Callsign",
+            "IRLP Location",
             "Notes",
         ]
         for col in expected_columns:
@@ -205,6 +211,65 @@ class TestDetailedRepeaterDownloader:
 
         # Check that the note appears in the Notes field
         assert "Note: Test note" in result.loc[1, "Notes"]
+
+    def test_structured_output_with_filtered_indices(self):
+        """Test that _create_structured_output handles filtered DataFrame indices correctly.
+
+        This is a regression test for the "single positional indexer is out-of-bounds" error
+        that occurred when band filtering removed some rows from the basic data.
+        """
+        # Create basic data with non-consecutive indices (simulating band filtering)
+        basic_data = pd.DataFrame(
+            {
+                "frequency": [145.200, 146.940, 447.100],
+                "call": ["W6ABC", "K6XYZ", "N6TEST"],
+                "county": ["County A", "County B", "County C"],
+                "use": ["OPEN", "OPEN", "CLUB"],
+                "status": ["On Air", "On Air", "On Air"],
+            }
+        )
+        # Simulate filtering by setting non-consecutive indices
+        basic_data.index = [
+            2,
+            5,
+            7,
+        ]  # Non-consecutive indices like after band filtering
+
+        # Detailed data that corresponds to the filtered indices
+        detailed_data = {
+            2: {
+                "sponsor": "Club A",
+                "grid_squares": ["DM13"],
+                "downlink_freq": "145.200",
+            },
+            5: {"sponsor": "Club B", "note": "Test note", "uplink_freq": "146.340"},
+            7: {"sponsor": "Club C", "dmr_color_code": "1", "is_dmr": "true"},
+        }
+
+        downloader = DetailedRepeaterDownloader()
+
+        # This should NOT raise "single positional indexer is out-of-bounds" error
+        result = downloader._create_structured_output(basic_data, detailed_data)
+
+        # Verify the result has the expected structure
+        assert len(result) == 3
+        assert list(result.index) == [2, 5, 7]  # Preserves original indices
+
+        # Check specific values to ensure data was mapped correctly
+        assert result.loc[2, "Call"] == "W6ABC"
+        assert result.loc[2, "Sponsor"] == "Club A"
+        assert result.loc[2, "Grid Square"] == "DM13"
+        assert result.loc[2, "Downlink"] == "145.200"
+
+        assert result.loc[5, "Call"] == "K6XYZ"
+        assert result.loc[5, "Sponsor"] == "Club B"
+        assert result.loc[5, "Uplink"] == "146.340"
+        assert "Note: Test note" in result.loc[5, "Notes"]
+
+        assert result.loc[7, "Call"] == "N6TEST"
+        assert result.loc[7, "Sponsor"] == "Club C"
+        assert result.loc[7, "DMR"] == "true"
+        assert result.loc[7, "Color Code"] == "1"
 
 
 class TestDetailedDownloaderFunctions:
@@ -286,6 +351,336 @@ class TestDetailedDownloaderFunctions:
         )
 
         assert result is mock_result
+
+
+class TestIRLPFunctionality:
+    """Test IRLP extraction and status fetching functionality."""
+
+    def test_extract_irlp_info_minimal(self):
+        """Test minimal IRLP information extraction with just node number."""
+        from bs4 import BeautifulSoup
+
+        downloader = DetailedRepeaterDownloader(debug=True)
+
+        # Mock HTML with minimal IRLP information
+        html_content = """
+        <html><body>
+        <p>Repeater Information:</p>
+        <p>IRLP: 3341</p>
+        </body></html>
+        """
+
+        soup = BeautifulSoup(html_content, "html.parser")
+        result = downloader._extract_irlp_info(soup, "test_url")
+
+        assert "irlp_node" in result
+        assert result["irlp_node"] == "3341"
+        # Status text should not be present for minimal case
+        assert "irlp_status_text" not in result or result["irlp_status_text"] == ""
+
+    def test_extract_irlp_info_with_status(self):
+        """Test IRLP information extraction with status text."""
+        from bs4 import BeautifulSoup
+
+        downloader = DetailedRepeaterDownloader(debug=True)
+
+        # Mock HTML with IRLP information including status
+        html_content = """
+        <html><body>
+        <p>Repeater Information:</p>
+        <p>IRLP: 3341 — IDLE for 0 days, 3 hours, 26 minutes, 46 seconds</p>
+        <a href="https://status.irlp.net/index.php?PSTART=3341">IRLP Status</a>
+        </body></html>
+        """
+
+        soup = BeautifulSoup(html_content, "html.parser")
+        result = downloader._extract_irlp_info(soup, "test_url")
+
+        assert "irlp_node" in result
+        assert result["irlp_node"] == "3341"
+        assert "irlp_status_text" in result
+        assert (
+            "IDLE for 0 days, 3 hours, 26 minutes, 46 seconds"
+            in result["irlp_status_text"]
+        )
+        assert "irlp_url" in result
+        assert "3341" in result["irlp_url"]
+
+    def test_extract_irlp_info_no_irlp(self):
+        """Test IRLP extraction when no IRLP info present."""
+        from bs4 import BeautifulSoup
+
+        downloader = DetailedRepeaterDownloader()
+
+        html_content = """
+        <html><body>
+        <p>Repeater Information:</p>
+        <p>No IRLP information here</p>
+        </body></html>
+        """
+
+        soup = BeautifulSoup(html_content, "html.parser")
+        result = downloader._extract_irlp_info(soup, "test_url")
+
+        assert result == {}  # Should return empty dict when no IRLP found
+
+    def test_extract_irlp_various_formats(self):
+        """Test IRLP extraction with various text formats."""
+        from bs4 import BeautifulSoup
+
+        downloader = DetailedRepeaterDownloader()
+
+        test_cases = [
+            ("IRLP: 1234", "1234", ""),
+            ("irlp: 5678 (Online)", "5678", "(Online)"),
+            ("IRLP: 9999 — CONNECTED to node 1000", "9999", "— CONNECTED to node 1000"),
+            ("IRLP: 7777 Available", "7777", "Available"),
+        ]
+
+        for html_text, expected_node, expected_status in test_cases:
+            html_content = f"<html><body><p>{html_text}</p></body></html>"
+            soup = BeautifulSoup(html_content, "html.parser")
+            result = downloader._extract_irlp_info(soup, "test_url")
+
+            assert "irlp_node" in result
+            assert result["irlp_node"] == expected_node
+            if expected_status:
+                assert "irlp_status_text" in result
+                assert expected_status.strip() in result["irlp_status_text"]
+
+    @patch("requests.Session.get")
+    def test_scrape_irlp_status_idle(self, mock_get):
+        """Test IRLP status scraping for idle node."""
+        downloader = DetailedRepeaterDownloader(debug=True)
+
+        # Mock IRLP status page response
+        mock_response = Mock()
+        mock_response.raise_for_status.return_value = None
+        mock_response.content = b"""
+        <html><body>
+        <h1>Node 3341 Status</h1>
+        <p>Call: VE7ABC-R</p>
+        <p>Status: IDLE for 2 days, 5 hours, 30 minutes</p>
+        <p>Location: Vancouver, BC</p>
+        <p>Last Activity: 2024-01-15 14:30:00</p>
+        <p>Owner: VE7ABC</p>
+        <p>Node Name: Vancouver Repeater</p>
+        </body></html>
+        """
+        mock_get.return_value = mock_response
+
+        result = downloader._scrape_irlp_status(
+            "https://status.irlp.net/index.php?PSTART=3341", "3341"
+        )
+
+        assert "irlp_node_status" in result
+        assert result["irlp_node_status"] == "IDLE"
+        assert "irlp_status_detail" in result
+        assert "2 days, 5 hours, 30 minutes" in result["irlp_status_detail"]
+        assert "irlp_callsign" in result
+        assert "VE7ABC" in result["irlp_callsign"]
+        assert "irlp_location" in result
+        assert "Vancouver, BC" in result["irlp_location"]
+        assert "irlp_last_activity" in result
+        assert "irlp_owner" in result
+        assert "VE7ABC" in result["irlp_owner"]
+        assert "irlp_node_name" in result
+        assert "Vancouver Repeater" in result["irlp_node_name"]
+
+    @patch("requests.Session.get")
+    def test_scrape_irlp_status_connected(self, mock_get):
+        """Test IRLP status scraping for connected node."""
+        downloader = DetailedRepeaterDownloader(debug=True)
+
+        # Mock IRLP status page response for connected node
+        mock_response = Mock()
+        mock_response.raise_for_status.return_value = None
+        mock_response.content = b"""
+        <html><body>
+        <h1>Node 1000 Status</h1>
+        <p>Call: W6ABC-R</p>
+        <p>Status: CONNECTED to reflector REF001C</p>
+        <p>Node Location: Los Angeles, CA</p>
+        <p>Last Connect: 2024-01-15 16:45:00</p>
+        </body></html>
+        """
+        mock_get.return_value = mock_response
+
+        result = downloader._scrape_irlp_status(
+            "https://status.irlp.net/index.php?PSTART=1000", "1000"
+        )
+
+        assert "irlp_node_status" in result
+        assert result["irlp_node_status"] == "CONNECTED"
+        assert "irlp_status_detail" in result
+        assert "reflector REF001C" in result["irlp_status_detail"]
+        assert "irlp_callsign" in result
+        assert "W6ABC" in result["irlp_callsign"]
+        assert "irlp_location" in result
+        assert "Los Angeles, CA" in result["irlp_location"]
+        assert "irlp_last_activity" in result
+
+    @patch("requests.Session.get")
+    def test_scrape_irlp_status_error(self, mock_get):
+        """Test IRLP status scraping when request fails."""
+        downloader = DetailedRepeaterDownloader()
+
+        # Mock failed request
+        mock_get.side_effect = Exception("Connection failed")
+
+        result = downloader._scrape_irlp_status(
+            "https://status.irlp.net/index.php?PSTART=3341", "3341"
+        )
+
+        assert "irlp_node_status" in result
+        assert result["irlp_node_status"] == "Error"
+        assert "irlp_error" in result
+        assert "Connection failed" in result["irlp_error"]
+
+    @patch("requests.Session.get")
+    def test_scrape_detail_page_with_irlp_integration(self, mock_get):
+        """Test integration of IRLP extraction within _scrape_detail_page method."""
+        downloader = DetailedRepeaterDownloader(debug=True)
+
+        # Mock the main detail page response
+        detail_response = Mock()
+        detail_response.raise_for_status.return_value = None
+        detail_response.content = b"""
+        <html><body>
+        <h1>Repeater Details</h1>
+        <p>Repeater ID: RB67890</p>
+        <p>Frequency: 146.520 MHz</p>
+        <p>IRLP: 2468 - IDLE for 1 day, 2 hours, 15 minutes</p>
+        <a href="https://status.irlp.net/index.php?PSTART=2468">IRLP Status</a>
+        <p>Location: Test City, WA</p>
+        <p>Sponsor: Test Amateur Radio Club</p>
+        </body></html>
+        """
+
+        # Mock the IRLP status page response
+        irlp_response = Mock()
+        irlp_response.raise_for_status.return_value = None
+        irlp_response.content = b"""
+        <html><body>
+        <h1>Node 2468 Status</h1>
+        <p>Call: K7TEST-R</p>
+        <p>Status: IDLE for 1 day, 2 hours, 15 minutes</p>
+        <p>Location: Test City, WA</p>
+        <p>Last Activity: 2024-01-14 12:15:00</p>
+        <p>Owner: K7TEST</p>
+        </body></html>
+        """
+
+        # Configure mock to return appropriate responses
+        def mock_get_side_effect(url, timeout=None):
+            if "details.php" in url:
+                return detail_response
+            elif "status.irlp.net" in url:
+                return irlp_response
+            else:
+                raise ValueError(f"Unexpected URL: {url}")
+
+        mock_get.side_effect = mock_get_side_effect
+
+        # Test the integration
+        result = downloader._scrape_detail_page(
+            "https://www.repeaterbook.com/repeaters/details.php?state_id=53&ID=67890"
+        )
+
+        # Verify basic detail data was extracted
+        assert "repeater_id" in result
+        assert result["repeater_id"] == "RB67890"
+
+        # Verify IRLP data was extracted and merged
+        assert "irlp_node" in result
+        assert result["irlp_node"] == "2468"
+        assert "irlp_status_text" in result
+        assert "IDLE for 1 day, 2 hours, 15 minutes" in result["irlp_status_text"]
+        assert "irlp_url" in result
+        assert "status.irlp.net" in result["irlp_url"]
+
+        # Verify IRLP status data was fetched and merged
+        assert "irlp_node_status" in result
+        assert result["irlp_node_status"] == "IDLE"
+        assert "irlp_callsign" in result
+        assert "K7TEST" in result["irlp_callsign"]
+        assert "irlp_location" in result
+        assert "Test City" in result["irlp_location"]
+        assert "irlp_last_activity" in result
+        assert "irlp_owner" in result
+        assert "K7TEST" in result["irlp_owner"]
+
+        # Verify both requests were made
+        assert mock_get.call_count == 2
+
+    def test_structured_output_with_irlp_data(self):
+        """Test that IRLP data is properly included in structured output."""
+        basic_data = pd.DataFrame(
+            {
+                "frequency": [145.200, 146.940],
+                "call": ["W6ABC", "K6XYZ"],
+                "location": ["City A", "City B"],
+            }
+        )
+
+        detailed_data = {
+            0: {
+                "sponsor": "Club A",
+                "irlp_node": "3341",
+                "irlp_node_status": "IDLE",
+                "irlp_last_activity": "2024-01-15 14:30:00",
+                "irlp_callsign": "VE7ABC",
+                "irlp_location": "Vancouver, BC",
+            },
+            1: {"sponsor": "Club B"},
+        }
+
+        downloader = DetailedRepeaterDownloader()
+        result = downloader._merge_data(basic_data, detailed_data)
+
+        assert len(result) == 2
+
+        # Check that IRLP columns are present
+        irlp_columns = [
+            "IRLP",
+            "IRLP Node",
+            "IRLP Status",
+            "IRLP Last Activity",
+            "IRLP Callsign",
+            "IRLP Location",
+        ]
+        for col in irlp_columns:
+            assert col in result.columns, f"Missing IRLP column: {col}"
+
+        # Check IRLP data mapping for first row
+        assert result.loc[0, "IRLP"] == "3341"
+        assert result.loc[0, "IRLP Node"] == "3341"  # Should be same as IRLP
+        assert result.loc[0, "IRLP Status"] == "IDLE"
+        assert result.loc[0, "IRLP Last Activity"] == "2024-01-15 14:30:00"
+        assert result.loc[0, "IRLP Callsign"] == "VE7ABC"
+        assert result.loc[0, "IRLP Location"] == "Vancouver, BC"
+
+        # Check that second row has empty IRLP data
+        assert result.loc[1, "IRLP"] == ""
+        assert result.loc[1, "IRLP Node"] == ""
+        assert result.loc[1, "IRLP Status"] == ""
+        assert result.loc[1, "IRLP Last Activity"] == ""
+        assert result.loc[1, "IRLP Callsign"] == ""
+        assert result.loc[1, "IRLP Location"] == ""
+
+        # Verify IRLP data is excluded from Notes field to prevent duplication
+        notes = result.loc[0, "Notes"]
+        irlp_keys = [
+            "irlp_node",
+            "irlp_node_status",
+            "irlp_last_activity",
+            "irlp_callsign",
+            "irlp_location",
+        ]
+        for key in irlp_keys:
+            assert (
+                key.title().replace("_", " ") not in notes
+            ), f"IRLP key {key} should not appear in Notes field"
 
 
 class TestEchoLinkFunctionality:
@@ -472,3 +867,137 @@ class TestEchoLinkFunctionality:
 
         # Verify both requests were made
         assert mock_get.call_count == 2
+
+
+class TestDMRDetectionImprovements:
+    """Test cases for improved DMR detection logic."""
+
+    def test_dmr_detection_color_code_only(self):
+        """Test DMR detection with color code but no numeric DMR ID (like WD6AML)."""
+        downloader = DetailedRepeaterDownloader(debug=False)
+
+        text = """
+        Cactus City, CA WD6AML Repeater ID: 06-16210
+        Downlink: 446.06250 Uplink: 441.06250 Offset: -5.000 MHz
+        DMR Color Code: 2 DMR ID: DMR ID Needed
+        DMR Network: Western States DMR County: Riverside Call: WD6AML
+        """
+
+        detail_data = {}
+        downloader._extract_dmr_data(text, detail_data)
+
+        assert detail_data["is_dmr"] == "true"
+        assert detail_data["dmr_color_code"] == "2"
+        assert "dmr_id" not in detail_data  # Should not extract non-numeric ID
+
+    def test_dmr_detection_full_data(self):
+        """Test DMR detection with both color code and numeric DMR ID (like K6TMD)."""
+        downloader = DetailedRepeaterDownloader(debug=False)
+
+        text = """
+        Pine Cove, CA K6TMD Repeater ID: 06-16060
+        Downlink: 446.06250 Uplink: 441.06250 Offset: -5.000 MHz
+        DMR Color Code: 1 DMR ID: 310724 IPSC Network: Western States
+        DMR – Color Code: 1 – TS Linked: TS1 TS2 – Trustee: WA6PYJ
+        DMR Network: Western States DMR County: Riverside Call: K6TMD
+        """
+
+        detail_data = {}
+        downloader._extract_dmr_data(text, detail_data)
+
+        assert detail_data["is_dmr"] == "true"
+        assert detail_data["dmr_color_code"] == "1"
+        assert detail_data["dmr_id"] == "310724"
+
+    def test_dmr_detection_non_dmr_repeater(self):
+        """Test DMR detection for non-DMR repeaters."""
+        downloader = DetailedRepeaterDownloader(debug=False)
+
+        text = """
+        Downlink: 146.52000 Uplink: 146.52000 Offset: 0.000 MHz
+        County: Los Angeles Call: N6ABC Use: OPEN
+        Analog FM repeater with no DMR capabilities
+        """
+
+        detail_data = {}
+        downloader._extract_dmr_data(text, detail_data)
+
+        assert detail_data["is_dmr"] == "false"
+        assert "dmr_color_code" not in detail_data
+        assert "dmr_id" not in detail_data
+
+    def test_dmr_detection_brandmeister_network(self):
+        """Test DMR detection with Brandmeister network indicators."""
+        downloader = DetailedRepeaterDownloader(debug=False)
+
+        text = """
+        Downlink: 441.12500 Uplink: 446.12500 Offset: +5.000 MHz
+        Color Code: 7 Brandmeister DMR Network County: Orange
+        Network: BrandMeister United States
+        """
+
+        detail_data = {}
+        downloader._extract_dmr_data(text, detail_data)
+
+        assert detail_data["is_dmr"] == "true"
+        assert detail_data["dmr_color_code"] == "7"
+
+    def test_dmr_detection_various_indicators(self):
+        """Test DMR detection with various DMR network indicators."""
+        downloader = DetailedRepeaterDownloader(debug=False)
+
+        test_cases = [
+            ("Western States DMR network", True),
+            ("IPSC Network: Some Network", True),
+            ("DMR-Marc network", True),
+            ("Regular analog repeater", False),
+            ("DMR Network: Test", True),
+        ]
+
+        for text, expected_dmr in test_cases:
+            detail_data = {}
+            downloader._extract_dmr_data(text, detail_data)
+
+            expected_result = "true" if expected_dmr else "false"
+            assert detail_data["is_dmr"] == expected_result, f"Failed for text: {text}"
+
+    def test_dmr_id_patterns(self):
+        """Test various DMR ID patterns."""
+        downloader = DetailedRepeaterDownloader(debug=False)
+
+        test_cases = [
+            ("DMR ID: 310724", "310724"),  # Standard format
+            ("DMR ID 123456", "123456"),  # No colon
+            ("DMRID: 789012", "789012"),  # Alternative format
+            ("DMR ID: DMR ID Needed", None),  # Non-numeric
+            ("No DMR ID here", None),  # No DMR ID
+        ]
+
+        for text, expected_id in test_cases:
+            detail_data = {}
+            downloader._extract_dmr_data(text, detail_data)
+
+            if expected_id:
+                assert "dmr_id" in detail_data
+                assert detail_data["dmr_id"] == expected_id
+            else:
+                assert "dmr_id" not in detail_data
+
+    def test_color_code_patterns(self):
+        """Test various color code patterns."""
+        downloader = DetailedRepeaterDownloader(debug=False)
+
+        test_cases = [
+            ("DMR Color Code: 2", "2"),
+            ("Color Code: 7", "7"),
+            ("DMR Color Code: 15", "15"),
+            ("Color Code: 1", "1"),
+        ]
+
+        for text, expected_code in test_cases:
+            detail_data = {}
+            downloader._extract_dmr_data(text, detail_data)
+
+            assert "dmr_color_code" in detail_data
+            assert detail_data["dmr_color_code"] == expected_code
+            assert detail_data["is_dmr"] == "true"  # Should detect DMR with color code

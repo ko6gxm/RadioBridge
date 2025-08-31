@@ -11,7 +11,12 @@ from ham_formatter.band_filter import (
     validate_bands,
     format_band_list,
 )
-from ham_formatter.csv_utils import read_csv, write_csv
+from ham_formatter.csv_utils import (
+    read_csv,
+    write_csv,
+    write_csv_with_comments,
+    read_csv_comments,
+)
 from ham_formatter.downloader import (
     download_repeater_data,
     download_repeater_data_by_county,
@@ -78,13 +83,7 @@ def main(ctx: click.Context, verbose: bool, log_file: Optional[str]) -> None:
     help="Amateur radio band(s) to include (e.g., 2m, 70cm, all). "
     "Can be specified multiple times.",
 )
-@click.option(
-    "--detailed",
-    "-d",
-    is_flag=True,
-    help="Download detailed information from individual repeater pages "
-    "(slower but more comprehensive)",
-)
+# Detailed downloads are now the default and only option
 @click.option(
     "--rate-limit",
     type=float,
@@ -117,7 +116,7 @@ def download(
     country: str,
     output: Optional[Path],
     band: tuple,
-    detailed: bool,
+    # detailed parameter removed - always True
     rate_limit: float,
     temp_dir: Optional[Path],
     nohammer: bool,
@@ -136,9 +135,7 @@ def download(
     - Multiple bands: --band 2m --band 70cm
     - Supported bands: 6m, 4m, 2m, 70cm, 33cm, 23cm
 
-    Detailed mode (--detailed):
-    - Downloads additional information from individual repeater detail pages
-    - Much slower but provides complete repeater specifications
+    All downloads include detailed information from individual repeater pages.
     - Use --rate-limit to control request frequency (default: 1.0 seconds)
     - Use --temp-dir to specify where temporary files are stored
     - Use --nohammer to enable random rate limiting (1-10s) for extra server respect
@@ -181,8 +178,6 @@ def download(
             "No-hammer mode enabled: will use random delays (1-10s) "
             "for each detail request"
         )
-        if not detailed:
-            logger.warning("No-hammer mode has no effect without --detailed flag")
 
     # Determine search type and parameters
     if county:
@@ -196,60 +191,46 @@ def download(
         logger.info(f"Starting download for {state}, {country}")
 
     try:
-        # Call appropriate download function with band filtering
-        if detailed:
-            if nohammer:
-                logger.info(
-                    "Using detailed scraping with no-hammer mode "
-                    "(random delays 1-10s)"
-                )
-            else:
-                logger.info(f"Using detailed scraping with rate limit: {rate_limit}s")
-
-            if search_type == "county":
-                data = download_with_details_by_county(
-                    state=state,
-                    county=county,
-                    country=country,
-                    bands=bands,
-                    rate_limit=rate_limit,
-                    temp_dir=temp_dir,
-                    nohammer=nohammer,
-                    debug=debug,
-                )
-            elif search_type == "city":
-                data = download_with_details_by_city(
-                    state=state,
-                    city=city,
-                    country=country,
-                    bands=bands,
-                    rate_limit=rate_limit,
-                    temp_dir=temp_dir,
-                    nohammer=nohammer,
-                    debug=debug,
-                )
-            else:
-                data = download_with_details(
-                    state=state,
-                    country=country,
-                    bands=bands,
-                    rate_limit=rate_limit,
-                    temp_dir=temp_dir,
-                    nohammer=nohammer,
-                    debug=debug,
-                )
+        # All downloads now use detailed scraping for comprehensive data
+        if nohammer:
+            logger.info(
+                "Using detailed scraping with no-hammer mode " "(random delays 1-10s)"
+            )
         else:
-            # Standard download without details
-            if search_type == "county":
-                data = download_repeater_data_by_county(
-                    state=state, county=county, country=country, bands=bands
-                )
-            elif search_type == "city":
-                data = download_repeater_data_by_city(
-                    state=state, city=city, country=country, bands=bands
-                )
-            else:
-                data = download_repeater_data(state=state, country=country, bands=bands)
+            logger.info(f"Using detailed scraping with rate limit: {rate_limit}s")
+
+        if search_type == "county":
+            data = download_with_details_by_county(
+                state=state,
+                county=county,
+                country=country,
+                bands=bands,
+                rate_limit=rate_limit,
+                temp_dir=temp_dir,
+                nohammer=nohammer,
+                debug=debug,
+            )
+        elif search_type == "city":
+            data = download_with_details_by_city(
+                state=state,
+                city=city,
+                country=country,
+                bands=bands,
+                rate_limit=rate_limit,
+                temp_dir=temp_dir,
+                nohammer=nohammer,
+                debug=debug,
+            )
+        else:
+            data = download_with_details(
+                state=state,
+                country=country,
+                bands=bands,
+                rate_limit=rate_limit,
+                temp_dir=temp_dir,
+                nohammer=nohammer,
+                debug=debug,
+            )
 
         # Generate output filename if not provided
         if output is None:
@@ -263,7 +244,25 @@ def download(
             else:
                 output = Path(f"repeaters_{state_lower}.csv")
 
-        write_csv(data, output)
+        # Build metadata comments for the CSV file
+        metadata_comments = {
+            "country": country,
+            "state": state,
+        }
+
+        if search_type == "county":
+            metadata_comments["county"] = county
+        elif search_type == "city":
+            metadata_comments["city"] = city
+
+        if bands != ["all"]:
+            metadata_comments["bands"] = ", ".join(bands)
+
+        metadata_comments["download_type"] = "detailed"
+        metadata_comments["total_repeaters"] = str(len(data))
+
+        # Write CSV with metadata comments
+        write_csv_with_comments(data, output, comments=metadata_comments)
 
         # Success message
         if search_type == "county":
@@ -310,6 +309,29 @@ def download(
     default=1,
     help="Starting channel number for the output (default: 1)",
 )
+@click.option(
+    "--zones",
+    is_flag=True,
+    help="Generate zone file alongside channel file (if radio supports it)",
+)
+@click.option(
+    "--zone-strategy",
+    type=click.Choice(["location", "band", "service", "mixed"]),
+    default="location",
+    help="Strategy for creating zones (default: location)",
+)
+@click.option(
+    "--max-zones",
+    type=int,
+    default=250,
+    help="Maximum number of zones to create (default: 250)",
+)
+@click.option(
+    "--max-channels-per-zone",
+    type=int,
+    default=64,
+    help="Maximum channels per zone (default: 64)",
+)
 @click.pass_context
 def format(
     ctx: click.Context,
@@ -317,14 +339,22 @@ def format(
     radio: str,
     output: Optional[Path],
     start_channel: int,
+    zones: bool,
+    zone_strategy: str,
+    max_zones: int,
+    max_channels_per_zone: int,
 ) -> None:
     """Format repeater data for a specific radio model."""
     logger = get_logger(__name__)
     logger.info(f"Starting format operation: {input_file} for {radio}")
 
     try:
-        # Load the data
-        data = read_csv(input_file)
+        # Read CSV comments for metadata
+        csv_metadata = read_csv_comments(input_file)
+        logger.debug(f"CSV metadata: {csv_metadata}")
+
+        # Load the data (comments will be ignored)
+        data = read_csv(input_file, comment="#")
 
         # Get the formatter for the specified radio
         formatter = get_radio_formatter(radio)
@@ -350,13 +380,59 @@ def format(
         # Write the formatted data
         write_csv(formatted_data, output)
 
-        click.echo(
-            f"Successfully formatted {len(formatted_data)} entries for "
-            f"{radio} to {output}"
-        )
+        files_created = [str(output)]
+
+        # Generate zone file if requested
+        if zones:
+            if formatter.supports_zone_files():
+                logger.info(f"Generating zone file using strategy: {zone_strategy}")
+
+                try:
+                    zone_data = formatter.format_zones(
+                        formatted_data,
+                        csv_metadata=csv_metadata,
+                        zone_strategy=zone_strategy,
+                        max_zones=max_zones,
+                        max_channels_per_zone=max_channels_per_zone,
+                    )
+
+                    # Create zone file name
+                    zone_output = (
+                        output.with_suffix("")
+                        .with_name(output.stem + "_zones")
+                        .with_suffix(".csv")
+                    )
+                    write_csv(zone_data, zone_output)
+                    files_created.append(str(zone_output))
+
+                    logger.info(
+                        f"Zone file created: {zone_output} with {len(zone_data)} zones"
+                    )
+
+                except Exception as e:
+                    logger.warning(f"Failed to generate zone file: {e}")
+                    click.echo(f"Warning: Failed to generate zone file: {e}", err=True)
+            else:
+                logger.warning(f"{radio} does not support zone file generation")
+                click.echo(
+                    f"Warning: {radio} does not support zone file generation", err=True
+                )
+
+        # Success message
+        if len(files_created) == 1:
+            click.echo(
+                f"Successfully formatted {len(formatted_data)} entries for "
+                f"{radio} to {output}"
+            )
+        else:
+            click.echo(
+                f"Successfully formatted {len(formatted_data)} entries for "
+                f"{radio} to {len(files_created)} files: {', '.join(files_created)}"
+            )
+
         logger.info(
             f"Format completed: {len(formatted_data)} entries for "
-            f"{radio} saved to {output}"
+            f"{radio} saved to {len(files_created)} file(s)"
         )
 
     except Exception as e:
