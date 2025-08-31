@@ -5,8 +5,6 @@ omit =
     */tests/*
     */test_*.py
     */__main__.py
-    */static_*.py
-    */enhanced_downloader.py
 
 [report]
 # Regexes for lines to exclude from consideration

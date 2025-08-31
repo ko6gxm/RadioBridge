@@ -96,9 +96,7 @@ branch = true
 omit = [
     "*/tests/*",
     "*/test_*.py",
-    "*/__main__.py",
-    "*/static_*.py",
-    "*/enhanced_downloader.py"
+    "*/__main__.py"
 ]
 
 [tool.coverage.report]

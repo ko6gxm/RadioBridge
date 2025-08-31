@@ -14,6 +14,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Fixed** for any bug fixes
 - **Security** for vulnerability fixes
 
+## [Unreleased]
+
+### Removed
+- 🧹 **Deprecated static frequency modules**: Cleaned up orphaned static list functionality
+  - Removed `static_cli.py`, `static_commands.py`, and `static_lists.py` modules
+  - Removed `enhanced_downloader.py` which was unused by main CLI
+  - Updated coverage configuration to remove obsolete exclusions
+  - Prepares codebase for reimplementation of static lists feature
+
 ## [0.2.0] - 2025-01-31
 
 ### Added
