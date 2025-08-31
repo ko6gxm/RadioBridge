@@ -3,9 +3,9 @@
 import pandas as pd
 import pytest
 
-from ham_formatter.radios import get_radio_formatter, get_supported_radios
-from ham_formatter.radios.anytone_878 import Anytone878Formatter
-from ham_formatter.radios.base import BaseRadioFormatter
+from radiobridge.radios import get_radio_formatter, get_supported_radios
+from radiobridge.radios.anytone_878 import Anytone878Formatter
+from radiobridge.radios.base import BaseRadioFormatter
 
 
 class TestRadioRegistry:
@@ -179,7 +179,7 @@ class TestBaofengDM32UVFormatter:
 
     def test_formatter_properties(self):
         """Test formatter properties are correctly set."""
-        from ham_formatter.radios.baofeng_dm32uv import BaofengDM32UVFormatter
+        from radiobridge.radios.baofeng_dm32uv import BaofengDM32UVFormatter
 
         formatter = BaofengDM32UVFormatter()
 
@@ -196,7 +196,7 @@ class TestBaofengDM32UVFormatter:
 
     def test_format_basic_data(self):
         """Test formatting basic repeater data for DM-32UV."""
-        from ham_formatter.radios.baofeng_dm32uv import BaofengDM32UVFormatter
+        from radiobridge.radios.baofeng_dm32uv import BaofengDM32UVFormatter
 
         formatter = BaofengDM32UVFormatter()
 
@@ -246,7 +246,7 @@ class TestToneUpDownFunctionality:
 
     def test_dm32uv_supports_separate_tones(self):
         """Test DM-32UV formatter with separate tone_up and tone_down."""
-        from ham_formatter.radios.baofeng_dm32uv import BaofengDM32UVFormatter
+        from radiobridge.radios.baofeng_dm32uv import BaofengDM32UVFormatter
 
         formatter = BaofengDM32UVFormatter()
 
@@ -289,7 +289,7 @@ class TestToneUpDownFunctionality:
 
     def test_anytone_578_supports_separate_tones(self):
         """Test Anytone 578 formatter with separate tone_up and tone_down."""
-        from ham_formatter.radios.anytone_578 import Anytone578Formatter
+        from radiobridge.radios.anytone_578 import Anytone578Formatter
 
         formatter = Anytone578Formatter()
 
@@ -309,7 +309,7 @@ class TestToneUpDownFunctionality:
 
     def test_baofeng_k5_supports_separate_tones(self):
         """Test Baofeng K5 formatter with separate tone_up and tone_down."""
-        from ham_formatter.radios.baofeng_k5 import BaofengK5Formatter
+        from radiobridge.radios.baofeng_k5 import BaofengK5Formatter
 
         formatter = BaofengK5Formatter()
 

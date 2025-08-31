@@ -1,8 +1,8 @@
-# Contributing to Ham Formatter 🤝
+# Contributing to RadioBridge 🤝
 
-**Thank you for your interest in contributing to Ham Formatter!** This project thrives on community contributions and we welcome all forms of participation - from bug reports to code contributions to documentation improvements.
+**Thank you for your interest in contributing to RadioBridge!** This project thrives on community contributions and we welcome all forms of participation - from bug reports to code contributions to documentation improvements.
 
-*Ham Formatter is built by the amateur radio community, for the amateur radio community.*
+*RadioBridge is built by the amateur radio community, for the amateur radio community.*
 
 ## 🚀 Quick Start for Contributors
 
@@ -26,7 +26,7 @@
 
 ## 🤝 Code of Conduct
 
-Ham Formatter follows the amateur radio community's tradition of respect, helpfulness, and technical excellence. We expect all contributors to:
+RadioBridge follows the amateur radio community's tradition of respect, helpfulness, and technical excellence. We expect all contributors to:
 
 - **Be Respectful**: Treat all community members with courtesy and respect
 - **Be Helpful**: Share knowledge and assist others when possible
@@ -54,7 +54,7 @@ Ham Formatter follows the amateur radio community's tradition of respect, helpfu
 
 **Questions?** Don't hesitate to:
 - Comment on issues asking for clarification
-- Start a [Discussion](https://github.com/ko6gxm/ham-formatter/discussions)
+- Start a [Discussion](https://github.com/ko6gxm/radiobridge/discussions)
 - Email craig@ko6gxm.com directly
 
 ## 🛠️ Types of Contributions
@@ -111,8 +111,8 @@ Ready to write code? Awesome!
 
 ```bash
 # Fork the repository on GitHub, then:
-git clone https://github.com/YOUR_USERNAME/ham-formatter.git
-cd ham-formatter
+git clone https://github.com/YOUR_USERNAME/radiobridge.git
+cd radiobridge
 ```
 
 ### 2. Set Up Environment
@@ -138,7 +138,7 @@ pipenv run pre-commit install
 pipenv run pytest
 
 # Try the CLI
-pipenv run ham-formatter --help
+pipenv run rb --help
 
 # Verify code formatting
 pipenv run black --check .
@@ -308,7 +308,7 @@ One of the most valuable contributions is adding support for new radio models!
 #### 1. Create Formatter Class
 
 ```python
-# src/ham_formatter/radios/my_radio.py
+# src/radiobridge/radios/my_radio.py
 from typing import List
 import pandas as pd
 from .base import BaseRadioFormatter
@@ -359,7 +359,7 @@ class MyRadioFormatter(BaseRadioFormatter):
 #### 2. Register the Formatter
 
 ```python
-# src/ham_formatter/radios/__init__.py
+# src/radiobridge/radios/__init__.py
 from .my_radio import MyRadioFormatter
 
 # Add to the registry
@@ -375,7 +375,7 @@ RADIO_FORMATTERS = {
 # tests/test_my_radio.py
 import pytest
 import pandas as pd
-from ham_formatter.radios.my_radio import MyRadioFormatter
+from radiobridge.radios.my_radio import MyRadioFormatter
 
 class TestMyRadioFormatter:
     def setup_method(self):
@@ -432,15 +432,15 @@ Contributors are recognized in several ways:
 - Feature announcements highlighting contributors
 - Amateur radio community forums and social media
 
-*Your contributions make Ham Formatter better for thousands of amateur radio operators worldwide!*
+*Your contributions make RadioBridge better for thousands of amateur radio operators worldwide!*
 
 ## 💬 Community
 
 ### Getting Help
 
 - **📖 Documentation**: Start with README.md and inline help
-- **💬 Discussions**: [GitHub Discussions](https://github.com/ko6gxm/ham-formatter/discussions)
-- **🐛 Issues**: [GitHub Issues](https://github.com/ko6gxm/ham-formatter/issues) for bugs
+- **💬 Discussions**: [GitHub Discussions](https://github.com/ko6gxm/radiobridge/discussions)
+- **🐛 Issues**: [GitHub Issues](https://github.com/ko6gxm/radiobridge/issues) for bugs
 - **📧 Direct Contact**: craig@ko6gxm.com for urgent matters
 
 ### Stay Connected
@@ -466,11 +466,11 @@ Contributors are recognized in several ways:
 
 <div align="center">
 
-**Thank you for contributing to Ham Formatter! 🎉**
+**Thank you for contributing to RadioBridge! 🎉**
 
 *Every contribution, no matter how small, makes a difference in the amateur radio community.*
 
-[![Contributors](https://img.shields.io/github/contributors/ko6gxm/ham-formatter)](https://github.com/ko6gxm/ham-formatter/graphs/contributors)
+[![Contributors](https://img.shields.io/github/contributors/ko6gxm/radiobridge)](https://github.com/ko6gxm/radiobridge/graphs/contributors)
 [![Amateur Radio](https://img.shields.io/badge/amateur%20radio-community-red.svg)](https://ko6gxm.com)
 
 *73 and happy coding!*

@@ -7,13 +7,13 @@ import pandas as pd
 import pytest
 import responses
 
-from ham_formatter.downloader import (
+from radiobridge.downloader import (
     RepeaterBookDownloader,
     download_repeater_data,
     download_repeater_data_by_county,
     download_repeater_data_by_city,
 )
-from ham_formatter.detailed_downloader import (
+from radiobridge.detailed_downloader import (
     download_with_details,
     download_with_details_by_county,
     download_with_details_by_city,
@@ -209,7 +209,7 @@ class TestRepeaterBookDownloader:
 class TestConvenienceFunctions:
     """Test top-level convenience functions."""
 
-    @patch("ham_formatter.detailed_downloader.DetailedRepeaterDownloader")
+    @patch("radiobridge.detailed_downloader.DetailedRepeaterDownloader")
     def test_download_with_details_by_county(self, mock_downloader_class):
         """Test county download convenience function."""
         mock_downloader = Mock()
@@ -241,7 +241,7 @@ class TestConvenienceFunctions:
         )
         assert isinstance(result, pd.DataFrame)
 
-    @patch("ham_formatter.detailed_downloader.DetailedRepeaterDownloader")
+    @patch("radiobridge.detailed_downloader.DetailedRepeaterDownloader")
     def test_download_with_details_by_city(self, mock_downloader_class):
         """Test city download convenience function."""
         mock_downloader = Mock()
@@ -273,7 +273,7 @@ class TestConvenienceFunctions:
         )
         assert isinstance(result, pd.DataFrame)
 
-    @patch("ham_formatter.detailed_downloader.DetailedRepeaterDownloader")
+    @patch("radiobridge.detailed_downloader.DetailedRepeaterDownloader")
     def test_original_download_function_still_works(self, mock_downloader_class):
         """Test that original download function is unchanged."""
         mock_downloader = Mock()

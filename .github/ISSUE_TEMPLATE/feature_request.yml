@@ -1,5 +1,5 @@
 name: Feature Request ✨
-description: Suggest a new feature or improvement for Ham Formatter
+description: Suggest a new feature or improvement for RadioBridge
 title: "[FEATURE] "
 labels: ["enhancement", "triage"]
 assignees:
@@ -9,7 +9,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Thanks for suggesting a new feature! Community input helps drive Ham Formatter's development.
+        Thanks for suggesting a new feature! Community input helps drive RadioBridge's development.
 
         Please search existing issues first to see if your idea has been discussed.
 
@@ -27,7 +27,7 @@ body:
     attributes:
       label: Proposed Solution
       description: What would you like to see added or changed?
-      placeholder: "I would like Ham Formatter to..."
+      placeholder: "I would like RadioBridge to..."
     validations:
       required: true
 
@@ -67,7 +67,7 @@ body:
       description: How would this feature be used? Provide specific examples.
       placeholder: |
         # Example usage:
-        ham-formatter download --feature new-option
+        rb download --feature new-option
 
         # Expected output:
         ...

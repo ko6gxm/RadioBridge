@@ -1,6 +1,6 @@
 # Pull Request 🚀
 
-**Thank you for contributing to Ham Formatter!** Please fill out the information below to help us review your changes.
+**Thank you for contributing to RadioBridge!** Please fill out the information below to help us review your changes.
 
 ## 📋 Summary
 

@@ -6,7 +6,7 @@ by amateur radio bands (2m, 70cm, etc.).
 
 from typing import Dict, List, Tuple
 
-from ham_formatter.logging_config import get_logger
+from radiobridge.logging_config import get_logger
 
 logger = get_logger(__name__)
 

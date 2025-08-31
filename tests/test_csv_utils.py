@@ -6,7 +6,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from ham_formatter.csv_utils import (
+from radiobridge.csv_utils import (
     clean_csv_data,
     read_csv,
     validate_csv_columns,

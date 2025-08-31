@@ -1,10 +1,10 @@
-"""Tests for ham_formatter.detailed_downloader module."""
+"""Tests for radiobridge.detailed_downloader module."""
 
 import pandas as pd
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-from ham_formatter.detailed_downloader import (
+from radiobridge.detailed_downloader import (
     DetailedRepeaterDownloader,
     download_with_details,
     download_with_details_by_county,
@@ -52,10 +52,10 @@ class TestDetailedRepeaterDownloader:
         assert second_call_time >= 0.1  # Should have slept
 
     @patch(
-        "ham_formatter.detailed_downloader."
+        "radiobridge.detailed_downloader."
         "DetailedRepeaterDownloader._scrape_with_links"
     )
-    @patch("ham_formatter.band_filter.filter_by_frequency")
+    @patch("radiobridge.band_filter.filter_by_frequency")
     def test_download_with_details_no_data(self, mock_filter, mock_scrape):
         """Test detailed download when no basic data is found."""
         # Setup mocks
@@ -72,15 +72,15 @@ class TestDetailedRepeaterDownloader:
         mock_filter.assert_called_once()
 
     @patch(
-        "ham_formatter.detailed_downloader."
+        "radiobridge.detailed_downloader."
         "DetailedRepeaterDownloader._scrape_with_links"
     )
-    @patch("ham_formatter.band_filter.filter_by_frequency")
+    @patch("radiobridge.band_filter.filter_by_frequency")
     @patch(
-        "ham_formatter.detailed_downloader."
+        "radiobridge.detailed_downloader."
         "DetailedRepeaterDownloader._collect_detailed_data"
     )
-    @patch("ham_formatter.detailed_downloader.DetailedRepeaterDownloader._merge_data")
+    @patch("radiobridge.detailed_downloader.DetailedRepeaterDownloader._merge_data")
     def test_download_with_details_success(
         self, mock_merge, mock_collect, mock_filter, mock_scrape
     ):
@@ -275,7 +275,7 @@ class TestDetailedRepeaterDownloader:
 class TestDetailedDownloaderFunctions:
     """Test cases for module-level convenience functions."""
 
-    @patch("ham_formatter.detailed_downloader.DetailedRepeaterDownloader")
+    @patch("radiobridge.detailed_downloader.DetailedRepeaterDownloader")
     def test_download_with_details(self, mock_downloader_class):
         """Test download_with_details convenience function."""
         # Setup mock
@@ -298,7 +298,7 @@ class TestDetailedDownloaderFunctions:
 
         assert result is mock_result
 
-    @patch("ham_formatter.detailed_downloader.DetailedRepeaterDownloader")
+    @patch("radiobridge.detailed_downloader.DetailedRepeaterDownloader")
     def test_download_with_details_by_county(self, mock_downloader_class):
         """Test download_with_details_by_county convenience function."""
         # Setup mock
@@ -325,7 +325,7 @@ class TestDetailedDownloaderFunctions:
 
         assert result is mock_result
 
-    @patch("ham_formatter.detailed_downloader.DetailedRepeaterDownloader")
+    @patch("radiobridge.detailed_downloader.DetailedRepeaterDownloader")
     def test_download_with_details_by_city(self, mock_downloader_class):
         """Test download_with_details_by_city convenience function."""
         # Setup mock

@@ -6,7 +6,7 @@ amateur radio frequencies that can be used alongside repeater data.
 
 from typing import Dict, List, Optional, Any
 import pandas as pd
-from ham_formatter.logging_config import get_logger
+from radiobridge.logging_config import get_logger
 
 
 class StaticFrequencyGenerator:

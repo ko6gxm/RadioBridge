@@ -57,7 +57,7 @@ jobs:
 
     - name: Run tests
       run: |
-        pipenv run pytest --cov=ham_formatter --cov-report=xml --cov-report=term-missing
+        pipenv run pytest --cov=radiobridge --cov-report=xml --cov-report=term-missing
 
     - name: Upload coverage to Codecov
       if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.11'
@@ -91,18 +91,18 @@ jobs:
 
     - name: Test CLI installation
       run: |
-        pipenv run ham-formatter --version
-        pipenv run ham-formatter --help
+        pipenv run rb --version
+        pipenv run rb --help
 
     - name: Test basic functionality
       run: |
-        pipenv run ham-formatter list-radios
+        pipenv run rb list-radios
 
     # Note: We avoid actual downloads in CI to respect RepeaterBook servers
     - name: Test CLI help system
       run: |
-        pipenv run ham-formatter download --help
-        pipenv run ham-formatter format --help
+        pipenv run rb download --help
+        pipenv run rb format --help
 
   build:
     name: Build Distribution
@@ -189,7 +189,7 @@ jobs:
         import time
         import psutil
         import pandas as pd
-        from ham_formatter.radios import get_radio_formatter
+        from radiobridge.radios import get_radio_formatter
 
         # Create large sample dataset
         data = pd.DataFrame({

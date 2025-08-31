@@ -6,11 +6,11 @@ import pandas as pd
 import requests
 from bs4 import BeautifulSoup
 
-from ham_formatter.band_filter import (
+from radiobridge.band_filter import (
     get_repeaterbook_band_param,
     filter_by_frequency,
 )
-from ham_formatter.logging_config import get_logger
+from radiobridge.logging_config import get_logger
 
 
 class RepeaterBookDownloader:

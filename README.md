@@ -1,4 +1,4 @@
-# Ham Formatter 📻
+# RadioBridge 📻
 
 **Professional Amateur Radio Repeater Programming Made Easy**
 
@@ -6,16 +6,16 @@
 
 [![Python Version](https://img.shields.io/badge/python-3.9+-blue.svg)](https://python.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Build Status](https://img.shields.io/badge/tests-115_passing-brightgreen.svg)](https://github.com/ko6gxm/ham-formatter)
-[![Coverage](https://img.shields.io/badge/coverage-69%25-yellowgreen.svg)](https://github.com/ko6gxm/ham-formatter)
+[![Build Status](https://img.shields.io/badge/tests-115_passing-brightgreen.svg)](https://github.com/ko6gxm/radiobridge)
+[![Coverage](https://img.shields.io/badge/coverage-69%25-yellowgreen.svg)](https://github.com/ko6gxm/radiobridge)
 [![Code Style: Black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
-[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/ko6gxm/ham-formatter/pulls)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/ko6gxm/radiobridge/pulls)
 
 ## 🚀 Overview
 
-Ham Formatter revolutionizes the way amateur radio operators manage their repeater programming. This sophisticated yet user-friendly tool automatically downloads comprehensive repeater information from RepeaterBook.com and intelligently formats it for your specific radio models.
+RadioBridge revolutionizes the way amateur radio operators manage their repeater programming. This sophisticated yet user-friendly tool automatically downloads comprehensive repeater information from RepeaterBook.com and intelligently formats it for your specific radio models.
 
-**Why Ham Formatter?**
+**Why RadioBridge?**
 - 🎯 **Precision**: Downloads detailed repeater information including tones, offsets, and operational status
 - 🌍 **Comprehensive**: Supports state, county, and city-level searches across multiple countries
 - 🔧 **Smart Formatting**: Automatically handles radio-specific CSV formats and field mappings
@@ -59,18 +59,18 @@ Ham Formatter revolutionizes the way amateur radio operators manage their repeat
 
 ```bash
 # Install from PyPI (when available)
-pip install ham-formatter
+pip install radiobridge
 
 # Or install from GitHub
-pip install git+https://github.com/ko6gxm/ham-formatter.git
+pip install git+https://github.com/ko6gxm/radiobridge.git
 ```
 
 ### Development Installation
 
 ```bash
 # Clone the repository
-git clone https://github.com/ko6gxm/ham-formatter.git
-cd ham-formatter
+git clone https://github.com/ko6gxm/radiobridge.git
+cd radiobridge
 
 # Install pipenv if not already installed
 pip install pipenv
@@ -82,7 +82,7 @@ pipenv install --dev
 pipenv run pip install -e .
 
 # Verify installation
-ham-formatter --version
+rb --version
 ```
 
 ### System Requirements
@@ -107,14 +107,14 @@ ham-formatter --version
 
 ```bash
 # See what radios are supported
-ham-formatter list-radios
+rb list-radios
 
 # Download and format in one command
-ham-formatter download --state CA --county "Orange" | \
-ham-formatter format --radio anytone-878 --output my_repeaters.csv
+rb download --state CA --county "Orange" | \
+rb format --radio anytone-878 --output my_repeaters.csv
 
 # Get detailed help
-ham-formatter download --help
+rb download --help
 ```
 
 ### 🖥️ Command Line Interface
@@ -124,26 +124,26 @@ ham-formatter download --help
 **Basic Downloads:**
 ```bash
 # Download all repeaters in California
-ham-formatter download --state CA
+rb download --state CA
 
 # Download with specific bands only
-ham-formatter download --state TX --band 2m --band 70cm
+rb download --state TX --band 2m --band 70cm
 
 # International support
-ham-formatter download --state ON --country Canada
+rb download --state ON --country Canada
 ```
 
 **Precision Targeting:**
 ```bash
 # County-level (perfect for local repeaters)
-ham-formatter download --state CA --county "Los Angeles"
+rb download --state CA --county "Los Angeles"
 
 # City-level (ultra-focused)
-ham-formatter download --state NY --city "New York"
+rb download --state NY --city "New York"
 
 # Multiple locations (script friendly)
 for county in "Orange" "Riverside" "San Bernardino"; do
-  ham-formatter download --state CA --county "$county" \
+  rb download --state CA --county "$county" \
     --output "ca_${county,,}_repeaters.csv"
 done
 ```
@@ -151,31 +151,31 @@ done
 **Advanced Options:**
 ```bash
 # Respectful downloading with random delays
-ham-formatter download --state CA --nohammer
+rb download --state CA --nohammer
 
 # Custom rate limiting (good for slow connections)
-ham-formatter download --state TX --rate-limit 2.0
+rb download --state TX --rate-limit 2.0
 
 # Debug mode (see all collected data)
-ham-formatter --verbose download --state CA --debug
+rb --verbose download --state CA --debug
 
 # Custom output location
-ham-formatter download --state CA --output /path/to/my/repeaters.csv
+rb download --state CA --output /path/to/my/repeaters.csv
 ```
 
 #### Format for Your Radio
 
 ```bash
 # Format downloaded data
-ham-formatter format repeaters.csv --radio anytone-878 --output programmed.csv
+rb format repeaters.csv --radio anytone-878 --output programmed.csv
 
 # Direct pipeline (download + format)
-ham-formatter download --state CA | \
-ham-formatter format --radio baofeng-k5 --output k5_ready.csv
+rb download --state CA | \
+rb format --radio baofeng-k5 --output k5_ready.csv
 
 # Multiple radio formats from same data
 for radio in anytone-878 anytone-578 baofeng-dm32uv baofeng-k5; do
-  ham-formatter format repeaters.csv --radio $radio --output "${radio}_repeaters.csv"
+  rb format repeaters.csv --radio $radio --output "${radio}_repeaters.csv"
 done
 ```
 
@@ -183,45 +183,45 @@ done
 
 ```bash
 # Verbose output (see what's happening)
-ham-formatter --verbose download --state CA
+rb --verbose download --state CA
 
 # Save logs for troubleshooting
-ham-formatter --verbose --log-file debug.log download --state CA
+rb --verbose --log-file debug.log download --state CA
 
 # Debug mode (maximum information)
-ham-formatter --verbose download --state CA --debug
+rb --verbose download --state CA --debug
 ```
 
 ### Python Library Usage
 
 ```python
-import ham_formatter
+import radiobridge
 
 # Download repeater data by state
-data = ham_formatter.download_repeater_data(state="CA", country="United States")
+data = radiobridge.download_repeater_data(state="CA", country="United States")
 
 # Download repeater data by county
-county_data = ham_formatter.download_repeater_data_by_county(
+county_data = radiobridge.download_repeater_data_by_county(
     state="CA", county="Los Angeles", country="United States"
 )
 
 # Download repeater data by city
-city_data = ham_formatter.download_repeater_data_by_city(
+city_data = radiobridge.download_repeater_data_by_city(
     state="TX", city="Austin", country="United States"
 )
 
 # Get a formatter for your radio
-from ham_formatter.radios import get_radio_formatter
+from radiobridge.radios import get_radio_formatter
 
 formatter = get_radio_formatter("anytone-878")
 formatted_data = formatter.format(data)
 
 # Save formatted data
-ham_formatter.write_csv(formatted_data, "my_repeaters.csv")
+radiobridge.write_csv(formatted_data, "my_repeaters.csv")
 
 # Note: Python library mode uses the same logging configuration
 # To enable verbose logging in your scripts:
-from ham_formatter.logging_config import setup_logging
+from radiobridge.logging_config import setup_logging
 setup_logging(verbose=True)  # Enable debug-level logging
 ```
 
@@ -231,13 +231,13 @@ setup_logging(verbose=True)  # Enable debug-level logging
 
 ```python
 import pandas as pd
-from ham_formatter import (
+from radiobridge import (
     read_csv,
     write_csv,
     download_repeater_data_by_county,
     download_repeater_data_by_city
 )
-from ham_formatter.radios import get_radio_formatter
+from radiobridge.radios import get_radio_formatter
 
 # Download data for multiple counties in a state
 counties = ["Los Angeles", "Orange", "Riverside"]
@@ -270,7 +270,7 @@ setup_logging(verbose=True, log_file="processing.log")
 ```bash
 # Clone repository
 git clone <repository-url>
-cd ham_formatter
+cd radiobridge
 
 # Install pipenv if not installed
 brew install pipenv
@@ -287,7 +287,7 @@ pipenv run pre-commit install
 
 ### Testing & Coverage
 
-Ham Formatter maintains high code quality with comprehensive testing:
+RadioBridge maintains high code quality with comprehensive testing:
 
 - **115+ Tests**: Complete test coverage for all functionality
 - **69% Code Coverage**: Focused on critical code paths
@@ -338,7 +338,7 @@ pipenv run pre-commit run --all-files
 
 ### Logging
 
-Ham Formatter includes comprehensive logging to help with debugging and monitoring:
+RadioBridge includes comprehensive logging to help with debugging and monitoring:
 
 #### Log Levels
 - **INFO**: Normal operation messages (file operations, progress updates)
@@ -349,26 +349,26 @@ Ham Formatter includes comprehensive logging to help with debugging and monitori
 #### CLI Logging
 ```bash
 # Normal operation (INFO level)
-ham-formatter download --state CA
+rb download --state CA
 
 # Verbose mode (DEBUG level) - shows detailed progress
-ham-formatter --verbose download --state CA
+rb --verbose download --state CA
 
 # Save logs to file
-ham-formatter --verbose --log-file debug.log download --state CA
+rb --verbose --log-file debug.log download --state CA
 ```
 
 #### Python Library Logging
 ```python
-from ham_formatter.logging_config import setup_logging
+from radiobridge.logging_config import setup_logging
 
 # Setup logging for your script
 setup_logging(verbose=True)  # Enable DEBUG level
 setup_logging(verbose=False, log_file="app.log")  # INFO to file
 
-# All ham_formatter operations will now log appropriately
-import ham_formatter
-data = ham_formatter.download_repeater_data("CA")
+# All radiobridge operations will now log appropriately
+import radiobridge
+data = radiobridge.download_repeater_data("CA")
 ```
 
 #### What Gets Logged
@@ -380,8 +380,8 @@ data = ham_formatter.download_repeater_data("CA")
 ### Project Structure
 
 ```
-ham_formatter/
-├── src/ham_formatter/           # Main package
+radiobridge/
+├── src/radiobridge/            # Main package
 │   ├── __init__.py             # Public API
 │   ├── cli.py                  # Command-line interface
 │   ├── csv_utils.py            # CSV read/write utilities
@@ -404,7 +404,7 @@ ham_formatter/
 
 To add support for a new radio model:
 
-1. Create a new formatter module in `src/ham_formatter/radios/`
+1. Create a new formatter module in `src/radiobridge/radios/`
 2. Inherit from `BaseRadioFormatter`
 3. Implement required methods and properties
 4. Register the formatter in `radios/__init__.py`
@@ -413,7 +413,7 @@ To add support for a new radio model:
 Example:
 
 ```python
-# src/ham_formatter/radios/my_radio.py
+# src/radiobridge/radios/my_radio.py
 from typing import List
 import pandas as pd
 from .base import BaseRadioFormatter
@@ -440,9 +440,9 @@ class MyRadioFormatter(BaseRadioFormatter):
         pass
 ```
 
-## 🌐 Data Sources & Ethics
+## 🌍 Data Sources & Ethics
 
-Ham Formatter responsibly sources data from [RepeaterBook.com](https://repeaterbook.com), the premier community-maintained database of amateur radio repeaters worldwide.
+RadioBridge responsibly sources data from [RepeaterBook.com](https://repeaterbook.com), the premier community-maintained database of amateur radio repeaters worldwide.
 
 ### 🤝 Respectful Usage
 - **Rate Limiting**: Built-in delays between requests (default: 1 second)
@@ -463,22 +463,22 @@ Ham Formatter responsibly sources data from [RepeaterBook.com](https://repeaterb
 ### 📱 Mobile Radio Programming
 ```bash
 # Program your mobile for a road trip through California
-ham-formatter download --state CA --band 2m --band 70cm --nohammer
-ham-formatter format ca_repeaters.csv --radio anytone-578 --output mobile_trip.csv
+rb download --state CA --band 2m --band 70cm --nohammer
+rb format ca_repeaters.csv --radio anytone-578 --output mobile_trip.csv
 ```
 
 ### 🏠 Home Station Setup
 ```bash
 # Get comprehensive local coverage
-ham-formatter download --state TX --county "Harris" --debug
-ham-formatter format harris_repeaters.csv --radio anytone-878 --output home_station.csv
+rb download --state TX --county "Harris" --debug
+rb format harris_repeaters.csv --radio anytone-878 --output home_station.csv
 ```
 
 ### ⚡ Emergency Communications
 ```bash
 # Quick deployment for emergency services
 for state in CA NV AZ; do
-  ham-formatter download --state $state --band 2m --output "emcomm_${state}.csv"
+  rb download --state $state --band 2m --output "emcomm_${state}.csv"
 done
 ```
 
@@ -487,11 +487,11 @@ done
 #!/bin/bash
 # Weekly repeater update script
 DATE=$(date +%Y%m%d)
-ham-formatter --verbose --log-file "update_${DATE}.log" \
+rb --verbose --log-file "update_${DATE}.log" \
   download --state CA --county "Orange" \
   --output "repeaters_${DATE}.csv"
 
-ham-formatter format "repeaters_${DATE}.csv" \
+rb format "repeaters_${DATE}.csv" \
   --radio anytone-878 --output "programmed_${DATE}.csv"
 ```
 
@@ -524,34 +524,34 @@ ham-formatter format "repeaters_${DATE}.csv" \
 **"No repeaters found" Error**
 ```bash
 # Check your search criteria
-ham-formatter download --state CA --county "Los Angeles" --verbose
+rb download --state CA --county "Los Angeles" --verbose
 
 # Verify spelling and try state-level first
-ham-formatter download --state CA --verbose
+rb download --state CA --verbose
 ```
 
 **Network/Timeout Issues**
 ```bash
 # Increase rate limiting for slow connections
-ham-formatter download --state TX --rate-limit 3.0
+rb download --state TX --rate-limit 3.0
 
 # Use no-hammer mode for better reliability
-ham-formatter download --state TX --nohammer
+rb download --state TX --nohammer
 ```
 
 **Radio Format Issues**
 ```bash
 # Check supported radios
-ham-formatter list-radios
+rb list-radios
 
 # Use exact radio identifier
-ham-formatter format data.csv --radio anytone-878 --verbose
+rb format data.csv --radio anytone-878 --verbose
 ```
 
 ### Debug Mode
 ```bash
 # Maximum diagnostic information
-ham-formatter --verbose --log-file debug.log download --state CA --debug
+rb --verbose --log-file debug.log download --state CA --debug
 
 # Check the log file for detailed information
 cat debug.log | grep ERROR
@@ -596,8 +596,8 @@ cat debug.log | grep ERROR
 
 ### Getting Help
 1. **📖 Documentation**: Check this README and inline help (`--help`)
-2. **🐛 Issues**: [GitHub Issues](https://github.com/ko6gxm/ham-formatter/issues) for bugs and feature requests
-3. **💬 Discussions**: [GitHub Discussions](https://github.com/ko6gxm/ham-formatter/discussions) for general questions
+2. **🐛 Issues**: [GitHub Issues](https://github.com/ko6gxm/radiobridge/issues) for bugs and feature requests
+3. **💬 Discussions**: [GitHub Discussions](https://github.com/ko6gxm/radiobridge/discussions) for general questions
 4. **📧 Direct Contact**: craig@ko6gxm.com for urgent issues
 
 ### Author
@@ -671,7 +671,7 @@ This software is provided "**as is**" without warranty of any kind. Users are re
 
 **Made with ❤️ by the Amateur Radio Community**
 
-*Ham Formatter - Professional repeater programming made simple*
+*RadioBridge - Professional repeater programming made simple*
 
 [![Built with Python](https://img.shields.io/badge/built%20with-Python-blue.svg)](https://python.org)
 [![Amateur Radio](https://img.shields.io/badge/amateur%20radio-FCC%20Part%2097-red.svg)](https://www.ecfr.gov/current/title-47/chapter-I/subchapter-D/part-97)

@@ -1,7 +1,7 @@
 [project]
-name = "ham-formatter"
-version = "0.2.0"
-description = "Download and format amateur radio repeater lists for various ham radio models"
+name = "radiobridge"
+version = "0.3.0"
+description = "Professional Amateur Radio Repeater Programming - Bridge RepeaterBook data to popular radio models"
 authors = [
     {name = "Craig Simon - KO6GXM", email = "craig@ko6gxm.com"},
 ]
@@ -21,7 +21,7 @@ classifiers = [
     "Programming Language :: Python :: 3.13",
     "Topic :: Communications :: Ham Radio",
 ]
-keywords = ["ham radio", "amateur radio", "repeater", "radio programming"]
+keywords = ["ham radio", "amateur radio", "repeater", "radio programming", "radiobridge", "repeaterbook"]
 dependencies = [
     "click>=8.0.0",
     "requests>=2.25.0",
@@ -42,15 +42,15 @@ dev = [
 ]
 
 [project.urls]
-"Homepage" = "https://github.com/ko6gxm/ham-formatter"
-"Documentation" = "https://github.com/ko6gxm/ham-formatter#readme"
-"Bug Tracker" = "https://github.com/ko6gxm/ham-formatter/issues"
-"Repository" = "https://github.com/ko6gxm/ham-formatter"
+"Homepage" = "https://github.com/ko6gxm/radiobridge"
+"Documentation" = "https://github.com/ko6gxm/radiobridge#readme"
+"Bug Tracker" = "https://github.com/ko6gxm/radiobridge/issues"
+"Repository" = "https://github.com/ko6gxm/radiobridge"
 "Author Website" = "https://ko6gxm.com"
-"Discussions" = "https://github.com/ko6gxm/ham-formatter/discussions"
+"Discussions" = "https://github.com/ko6gxm/radiobridge/discussions"
 
 [project.scripts]
-ham-formatter = "ham_formatter.cli:main"
+rb = "radiobridge.cli:main"
 
 [build-system]
 requires = ["setuptools>=61.0", "wheel"]
@@ -79,7 +79,7 @@ extend-exclude = '''
 
 [tool.pytest.ini_options]
 minversion = "6.0"
-addopts = "-ra -q --strict-markers --cov=ham_formatter --cov-report=term-missing --cov-report=html --cov-report=xml"
+addopts = "-ra -q --strict-markers --cov=radiobridge --cov-report=term-missing --cov-report=html --cov-report=xml"
 testpaths = ["tests"]
 python_files = ["test_*.py", "*_test.py"]
 python_classes = ["Test*"]
@@ -91,7 +91,7 @@ markers = [
 ]
 
 [tool.coverage.run]
-source = ["src/ham_formatter"]
+source = ["src/radiobridge"]
 branch = true
 omit = [
     "*/tests/*",
@@ -117,7 +117,7 @@ show_missing = true
 
 [tool.coverage.html]
 directory = "htmlcov"
-title = "Ham Formatter Coverage Report"
+title = "RadioBridge Coverage Report"
 
 [tool.coverage.xml]
 output = "coverage.xml"

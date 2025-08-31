@@ -1,4 +1,4 @@
-"""Command-line interface for ham_formatter."""
+"""Command-line interface for radiobridge."""
 
 import sys
 from pathlib import Path
@@ -6,29 +6,29 @@ from typing import Optional
 
 import click
 
-from ham_formatter import __version__
-from ham_formatter.band_filter import (
+from radiobridge import __version__
+from radiobridge.band_filter import (
     validate_bands,
     format_band_list,
 )
-from ham_formatter.csv_utils import (
+from radiobridge.csv_utils import (
     read_csv,
     write_csv,
     write_csv_with_comments,
     read_csv_comments,
 )
-from ham_formatter.downloader import (
+from radiobridge.downloader import (
     download_repeater_data,
     download_repeater_data_by_county,
     download_repeater_data_by_city,
 )
-from ham_formatter.detailed_downloader import (
+from radiobridge.detailed_downloader import (
     download_with_details,
     download_with_details_by_county,
     download_with_details_by_city,
 )
-from ham_formatter.logging_config import setup_logging, get_logger
-from ham_formatter.radios import get_supported_radios, get_radio_formatter
+from radiobridge.logging_config import setup_logging, get_logger
+from radiobridge.radios import get_supported_radios, get_radio_formatter
 
 
 @click.group()
@@ -37,11 +37,11 @@ from ham_formatter.radios import get_supported_radios, get_radio_formatter
 @click.option("--log-file", type=click.Path(), help="Write logs to specified file")
 @click.pass_context
 def main(ctx: click.Context, verbose: bool, log_file: Optional[str]) -> None:
-    """Ham Formatter - Download and format amateur radio repeater lists.
+    """RadioBridge - Professional Amateur Radio Repeater Programming
 
-    A tool for downloading repeater information from RepeaterBook.com and formatting
-    it for various ham radio models including Anytone, Baofeng, and others.
-    """
+    Bridge RepeaterBook data to popular radio models with advanced features
+    including county/city targeting, detailed information collection, and
+    intelligent rate limiting."""
     ctx.ensure_object(dict)
     ctx.obj["verbose"] = verbose
     ctx.obj["log_file"] = log_file
@@ -272,9 +272,10 @@ def download(
         else:
             location = state
 
+        location_desc = location
         band_desc = format_band_list(bands)
         click.echo(
-            f"Successfully downloaded {len(data)} repeaters from {location} "
+            f"RadioBridge: Successfully downloaded {len(data)} repeaters from {location_desc} "
             f"({band_desc}) to {output}"
         )
         logger.info(
@@ -421,8 +422,8 @@ def format(
         # Success message
         if len(files_created) == 1:
             click.echo(
-                f"Successfully formatted {len(formatted_data)} entries for "
-                f"{radio} to {output}"
+                f"RadioBridge: Successfully formatted {len(formatted_data)} repeaters for "
+                f"{formatter.radio_name} to {output}"
             )
         else:
             click.echo(
@@ -450,7 +451,7 @@ def list_radios() -> None:
         click.echo("No supported radios found.")
         return
 
-    click.echo("Supported radio models:")
+    click.echo("RadioBridge - Supported radio models:")
     for radio in sorted(radios):
         click.echo(f"  • {radio}")
 

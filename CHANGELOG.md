@@ -1,6 +1,6 @@
 # Changelog
 
-*All notable changes to Ham Formatter will be documented in this file.*
+*All notable changes to RadioBridge will be documented in this file.*
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
@@ -20,13 +20,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 🎯 **County-level downloads**: Precision targeting for local repeater coverage
   - New `RepeaterBookDownloader.download_by_county()` method
   - New `download_with_details_by_county()` convenience function
-  - CLI support: `ham-formatter download --state CA --county "Los Angeles"`
+  - CLI support: `rb download --state CA --county "Los Angeles"`
   - Perfect for local emergency services and club operations
 
 - 🏙️ **City-level downloads**: Ultra-focused repeater lists for urban areas
   - New `RepeaterBookDownloader.download_by_city()` method
   - New `download_with_details_by_city()` convenience function
-  - CLI support: `ham-formatter download --state TX --city Austin`
+  - CLI support: `rb download --state TX --city Austin`
   - Ideal for mobile operations and travel planning
 
 - 📡 **Detailed information collection**: Automatic gathering of extended repeater metadata
@@ -119,7 +119,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Backward Compatibility 🛡️
 - **100% backward compatible**: All existing functionality preserved
 - Original `download_repeater_data()` function works exactly as before
-- State-level CLI usage (`ham-formatter download --state CA`) unchanged
+- State-level CLI usage (`rb download --state CA`) unchanged
 - All radio formatters maintain identical APIs and behavior
 - Existing scripts and integrations continue to work without modification
 - Same output formats and file structures for seamless upgrades
@@ -127,7 +127,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.1.0] - 2025-01-15
 
 ### Added
-- 🚀 **Initial release of Ham Formatter**: Professional repeater programming tool
+- 🚀 **Initial release of RadioBridge**: Professional repeater programming tool
 - 🌍 **State-level repeater downloads**: Access RepeaterBook.com's comprehensive database
 - 📡 **Multi-radio support**: Formatters for popular amateur radio models
   - **Anytone AT-D878UV II Plus**: DMR/Analog handheld with GPS and Bluetooth
@@ -166,6 +166,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-*Ham Formatter is developed by Craig Simon (KO6GXM) with ❤️ for the amateur radio community.*
+*RadioBridge is developed by Craig Simon (KO6GXM) with ❤️ for the amateur radio community.*
 
 *Visit [ko6gxm.com](https://ko6gxm.com) for more amateur radio tools and tutorials.*

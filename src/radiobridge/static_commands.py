@@ -8,8 +8,8 @@ command interfaces.
 from typing import Dict, List, Optional, Union
 import pandas as pd
 
-from ham_formatter.enhanced_downloader import StaticOnlyDownloader
-from ham_formatter.logging_config import get_logger
+from radiobridge.enhanced_downloader import StaticOnlyDownloader
+from radiobridge.logging_config import get_logger
 
 
 def list_available_static_lists() -> Dict[str, Dict[str, any]]:

@@ -1,4 +1,4 @@
-"""Logging configuration for ham_formatter."""
+"""Logging configuration for radiobridge."""
 
 import logging
 import sys
@@ -6,7 +6,7 @@ from typing import Optional
 
 
 def setup_logging(verbose: bool = False, log_file: Optional[str] = None) -> None:
-    """Set up logging configuration for ham_formatter.
+    """Set up logging configuration for radiobridge.
 
     Args:
         verbose: If True, set log level to DEBUG, otherwise INFO
@@ -21,8 +21,8 @@ def setup_logging(verbose: bool = False, log_file: Optional[str] = None) -> None
         datefmt="%Y-%m-%d %H:%M:%S",
     )
 
-    # Get root logger for ham_formatter
-    logger = logging.getLogger("ham_formatter")
+    # Get root logger for radiobridge
+    logger = logging.getLogger("radiobridge")
     logger.setLevel(log_level)
 
     # Remove any existing handlers to avoid duplicates
@@ -57,6 +57,6 @@ def get_logger(name: str) -> logging.Logger:
         name: Module name (usually __name__)
 
     Returns:
-        Logger instance configured for ham_formatter
+        Logger instance configured for radiobridge
     """
-    return logging.getLogger(f'ham_formatter.{name.split(".")[-1]}')
+    return logging.getLogger(f'radiobridge.{name.split(".")[-1]}')

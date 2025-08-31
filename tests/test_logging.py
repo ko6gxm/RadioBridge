@@ -7,8 +7,8 @@ import pandas as pd
 import pytest
 from click.testing import CliRunner
 
-from ham_formatter.cli import main
-from ham_formatter.logging_config import setup_logging, get_logger
+from radiobridge.cli import main
+from radiobridge.logging_config import setup_logging, get_logger
 
 
 class TestLoggingConfig:
@@ -57,11 +57,11 @@ class TestLoggingConfig:
 
     def test_get_logger_module_naming(self):
         """Test that get_logger creates properly named loggers."""
-        logger = get_logger("ham_formatter.test_module")
-        assert logger.name == "ham_formatter.test_module"
+        logger = get_logger("radiobridge.test_module")
+        assert logger.name == "radiobridge.test_module"
 
         logger = get_logger("some.nested.module")
-        assert logger.name == "ham_formatter.module"
+        assert logger.name == "radiobridge.module"
 
     def test_logging_formatter(self, caplog):
         """Test that logging formatter includes expected fields."""
@@ -72,7 +72,7 @@ class TestLoggingConfig:
 
             # Check that log record has expected format elements
             record = caplog.records[0]
-            assert record.name.startswith("ham_formatter")
+            assert record.name.startswith("radiobridge")
             assert record.levelname == "INFO"
             assert record.getMessage() == "Test message"
 
@@ -117,8 +117,8 @@ class TestCLILogging:
         """Test that download command generates appropriate log messages."""
         with caplog.at_level(logging.INFO):
             # Use mock to avoid actual HTTP requests
-            with patch("ham_formatter.cli.download_with_details") as mock_download:
-                with patch("ham_formatter.cli.write_csv"):
+            with patch("radiobridge.cli.download_with_details") as mock_download:
+                with patch("radiobridge.cli.write_csv"):
                     # Create a proper pandas DataFrame mock
                     import pandas as pd
 
@@ -166,11 +166,11 @@ class TestCLILogging:
         input_file.write_text("frequency\\n146.520\\n")
 
         with caplog.at_level(logging.INFO):
-            with patch("ham_formatter.cli.read_csv") as mock_read:
+            with patch("radiobridge.cli.read_csv") as mock_read:
                 with patch(
-                    "ham_formatter.cli.get_radio_formatter"
+                    "radiobridge.cli.get_radio_formatter"
                 ) as mock_get_formatter:
-                    with patch("ham_formatter.cli.write_csv"):
+                    with patch("radiobridge.cli.write_csv"):
 
                         # Set up mocks
                         mock_data = MagicMock()
@@ -219,7 +219,7 @@ class TestModuleLogging:
 
     def test_downloader_logging(self, caplog):
         """Test that downloader module generates appropriate logs."""
-        from ham_formatter.downloader import RepeaterBookDownloader
+        from radiobridge.downloader import RepeaterBookDownloader
 
         with caplog.at_level(logging.DEBUG):
             RepeaterBookDownloader(timeout=10)
@@ -234,7 +234,7 @@ class TestModuleLogging:
 
     def test_csv_utils_logging(self, caplog, tmp_path):
         """Test that CSV utilities generate appropriate logs."""
-        from ham_formatter.csv_utils import write_csv
+        from radiobridge.csv_utils import write_csv
         import pandas as pd
 
         with caplog.at_level(logging.INFO):
@@ -253,7 +253,7 @@ class TestModuleLogging:
 
     def test_radio_formatter_logging(self, caplog):
         """Test that radio formatters generate appropriate logs."""
-        from ham_formatter.radios import get_radio_formatter
+        from radiobridge.radios import get_radio_formatter
 
         with caplog.at_level(logging.INFO):
             formatter = get_radio_formatter("anytone-878")
@@ -276,7 +276,7 @@ class TestModuleLogging:
 
     def test_radio_formatter_validation_logging(self, caplog):
         """Test that radio formatter validation generates logs."""
-        from ham_formatter.radios import get_radio_formatter
+        from radiobridge.radios import get_radio_formatter
         import pandas as pd
 
         with caplog.at_level(logging.DEBUG):
@@ -366,7 +366,7 @@ class TestFormatterLogging:
 
     def test_anytone_878_formatter_logging(self, caplog):
         """Test logging in Anytone 878 formatter."""
-        from ham_formatter.radios.anytone_878 import Anytone878Formatter
+        from radiobridge.radios.anytone_878 import Anytone878Formatter
 
         with caplog.at_level(logging.DEBUG):
             formatter = Anytone878Formatter()
@@ -400,7 +400,7 @@ class TestFormatterLogging:
 
     def test_anytone_578_formatter_logging(self, caplog):
         """Test logging in Anytone 578 formatter."""
-        from ham_formatter.radios.anytone_578 import Anytone578Formatter
+        from radiobridge.radios.anytone_578 import Anytone578Formatter
 
         with caplog.at_level(logging.DEBUG):
             formatter = Anytone578Formatter()
@@ -440,7 +440,7 @@ class TestFormatterLogging:
 
     def test_baofeng_k5_formatter_logging(self, caplog):
         """Test logging in Baofeng K5 formatter."""
-        from ham_formatter.radios.baofeng_k5 import BaofengK5Formatter
+        from radiobridge.radios.baofeng_k5 import BaofengK5Formatter
 
         with caplog.at_level(logging.DEBUG):
             formatter = BaofengK5Formatter()
@@ -480,7 +480,7 @@ class TestFormatterLogging:
 
     def test_baofeng_dm32uv_formatter_logging(self, caplog):
         """Test logging in Baofeng DM-32UV formatter."""
-        from ham_formatter.radios.baofeng_dm32uv import BaofengDM32UVFormatter
+        from radiobridge.radios.baofeng_dm32uv import BaofengDM32UVFormatter
 
         with caplog.at_level(logging.DEBUG):
             formatter = BaofengDM32UVFormatter()
@@ -520,7 +520,7 @@ class TestFormatterLogging:
 
     def test_formatter_error_logging(self, caplog):
         """Test that formatters log errors appropriately."""
-        from ham_formatter.radios.anytone_878 import Anytone878Formatter
+        from radiobridge.radios.anytone_878 import Anytone878Formatter
         import pandas as pd
 
         with caplog.at_level(logging.ERROR):
@@ -542,7 +542,7 @@ class TestFormatterLogging:
 
     def test_formatter_skip_invalid_data_logging(self, caplog):
         """Test that formatters log when skipping invalid data."""
-        from ham_formatter.radios.anytone_578 import Anytone578Formatter
+        from radiobridge.radios.anytone_578 import Anytone578Formatter
         import pandas as pd
 
         with caplog.at_level(logging.DEBUG):
@@ -573,7 +573,7 @@ class TestFormatterLogging:
 
     def test_formatter_input_validation_logging(self, caplog):
         """Test that formatters log input validation details."""
-        from ham_formatter.radios.baofeng_k5 import BaofengK5Formatter
+        from radiobridge.radios.baofeng_k5 import BaofengK5Formatter
         import pandas as pd
 
         with caplog.at_level(logging.DEBUG):

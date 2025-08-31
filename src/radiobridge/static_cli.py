@@ -14,13 +14,13 @@ from typing import List, Optional
 
 import pandas as pd
 
-from ham_formatter.static_commands import (
+from radiobridge.static_commands import (
     list_available_static_lists,
     generate_static_lists,
     save_static_output,
     format_static_list_info,
 )
-from ham_formatter.logging_config import get_logger
+from radiobridge.logging_config import get_logger
 
 
 def create_parser() -> argparse.ArgumentParser:
@@ -31,19 +31,19 @@ def create_parser() -> argparse.ArgumentParser:
         epilog="""
 Examples:
   # Generate all national calling frequencies
-  python -m ham_formatter.static_cli national_calling -o calling_freqs.csv
+  python -m radiobridge.static_cli national_calling -o calling_freqs.csv
 
   # Generate only 2m and 70cm calling frequencies
-  python -m ham_formatter.static_cli national_calling --bands 2m 70cm -o calling_freqs.csv
+  python -m radiobridge.static_cli national_calling --bands 2m 70cm -o calling_freqs.csv
 
   # Generate emergency simplex frequencies
-  python -m ham_formatter.static_cli emergency_simplex -o emergency_freqs.csv
+  python -m radiobridge.static_cli emergency_simplex -o emergency_freqs.csv
 
   # Generate multiple lists combined
-  python -m ham_formatter.static_cli national_calling emergency_simplex -o combined_freqs.csv
+  python -m radiobridge.static_cli national_calling emergency_simplex -o combined_freqs.csv
 
   # List available static frequency lists
-  python -m ham_formatter.static_cli --list
+  python -m radiobridge.static_cli --list
 
 Supported Bands:
   - 2m (146.52 MHz calling)
@@ -143,7 +143,7 @@ def main() -> int:
     """Main CLI entry point."""
     # Issue deprecation warning
     warnings.warn(
-        "The 'python -m ham_formatter.static_cli' interface is deprecated. "
+        "The 'python -m radiobridge.static_cli' interface is deprecated. "
         "Use 'ham-formatter list-static' and 'ham-formatter generate-static' instead.",
         DeprecationWarning,
         stacklevel=2,
@@ -157,7 +157,7 @@ def main() -> int:
     if args.verbose:
         import logging
 
-        logging.getLogger("ham_formatter").setLevel(logging.DEBUG)
+        logging.getLogger("radiobridge").setLevel(logging.DEBUG)
 
     try:
         # List available lists

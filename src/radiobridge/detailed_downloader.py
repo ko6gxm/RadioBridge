@@ -15,8 +15,8 @@ from urllib.parse import urljoin
 import pandas as pd
 from bs4 import BeautifulSoup
 
-from ham_formatter.downloader import RepeaterBookDownloader
-from ham_formatter.logging_config import get_logger
+from radiobridge.downloader import RepeaterBookDownloader
+from radiobridge.logging_config import get_logger
 
 
 class DetailedRepeaterDownloader(RepeaterBookDownloader):
@@ -80,7 +80,7 @@ class DetailedRepeaterDownloader(RepeaterBookDownloader):
             basic_data, detail_links = self._scrape_with_links(params)
 
             # Apply band filtering to basic data
-            from ham_formatter.band_filter import filter_by_frequency
+            from radiobridge.band_filter import filter_by_frequency
 
             basic_data = filter_by_frequency(basic_data, bands)
 
@@ -100,7 +100,7 @@ class DetailedRepeaterDownloader(RepeaterBookDownloader):
 
             # Create temporary directory for this download session
             with tempfile.TemporaryDirectory(
-                dir=self.temp_dir, prefix="ham_formatter_"
+                dir=self.temp_dir, prefix="radiobridge_"
             ) as temp_session_dir:
                 session_dir = Path(temp_session_dir)
                 self.logger.debug(f"Using temporary directory: {session_dir}")
@@ -1278,7 +1278,7 @@ class DetailedRepeaterDownloader(RepeaterBookDownloader):
             self._detail_links = detail_links
 
             # Apply frequency-based band filtering
-            from ham_formatter.band_filter import filter_by_frequency
+            from radiobridge.band_filter import filter_by_frequency
 
             return filter_by_frequency(html_data, bands)
         else:

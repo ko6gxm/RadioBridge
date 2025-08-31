@@ -7,9 +7,9 @@ generation of static frequency lists alongside repeater data.
 from typing import Dict, List, Optional, Any, Union
 import pandas as pd
 
-from ham_formatter.downloader import RepeaterBookDownloader
-from ham_formatter.static_lists import StaticFrequencyGenerator
-from ham_formatter.logging_config import get_logger
+from radiobridge.downloader import RepeaterBookDownloader
+from radiobridge.static_lists import StaticFrequencyGenerator
+from radiobridge.logging_config import get_logger
 
 
 class EnhancedDownloader:

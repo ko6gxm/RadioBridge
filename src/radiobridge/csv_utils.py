@@ -5,7 +5,7 @@ from typing import Any, Dict, List, Optional, Union
 
 import pandas as pd
 
-from ham_formatter.logging_config import get_logger
+from radiobridge.logging_config import get_logger
 
 logger = get_logger(__name__)
 

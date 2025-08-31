@@ -7,7 +7,7 @@ required by that radio's programming software.
 
 from typing import Dict, List, Optional, Type
 
-from ham_formatter.logging_config import get_logger
+from radiobridge.logging_config import get_logger
 from .base import BaseRadioFormatter
 from .anytone_878 import Anytone878Formatter
 from .anytone_578 import Anytone578Formatter
