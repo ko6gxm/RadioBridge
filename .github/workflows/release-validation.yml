@@ -1,0 +1,293 @@
+name: Release Validation 🔍
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to validate (e.g., 0.3.0)'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  validate-pypi-release:
+    name: Validate PyPI Installation
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ["3.9", "3.11", "3.13"]
+
+    steps:
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Determine version to test
+      id: version
+      run: |
+        if [ "${{ github.event_name }}" = "release" ]; then
+          VERSION="${{ github.event.release.tag_name }}"
+          VERSION="${VERSION#v}"  # Remove 'v' prefix if present
+        else
+          VERSION="${{ github.event.inputs.version }}"
+        fi
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        echo "Testing version: $VERSION"
+
+    - name: Wait for PyPI package availability
+      run: |
+        VERSION="${{ steps.version.outputs.version }}"
+        echo "Waiting for radiobridge==$VERSION to become available on PyPI..."
+
+        MAX_ATTEMPTS=30
+        ATTEMPT=1
+
+        while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
+          echo "Attempt $ATTEMPT/$MAX_ATTEMPTS: Checking PyPI availability..."
+
+          if pip index versions radiobridge | grep -q "$VERSION"; then
+            echo "✅ Version $VERSION found on PyPI!"
+            break
+          fi
+
+          if [ $ATTEMPT -eq $MAX_ATTEMPTS ]; then
+            echo "❌ Timeout: Version $VERSION not found on PyPI after $MAX_ATTEMPTS attempts"
+            exit 1
+          fi
+
+          echo "⏳ Version not yet available, waiting 30 seconds..."
+          sleep 30
+          ATTEMPT=$((ATTEMPT + 1))
+        done
+
+    - name: Install from PyPI
+      run: |
+        VERSION="${{ steps.version.outputs.version }}"
+        echo "Installing radiobridge==$VERSION from PyPI..."
+        pip install --no-cache-dir radiobridge==$VERSION
+
+        # Verify installation
+        pip show radiobridge
+        python -c "import radiobridge; print(f'Installed version: {radiobridge.__version__}')"
+
+    - name: Test CLI functionality
+      run: |
+        # Test basic CLI commands
+        rb --version
+        rb --help
+        rb list-radios
+
+        # Verify version matches expected
+        VERSION="${{ steps.version.outputs.version }}"
+        CLI_VERSION=$(rb --version | grep -o '[0-9]\+\.[0-9]\+\.[0-9]\+[a-zA-Z0-9]*' || echo "unknown")
+
+        if [ "$CLI_VERSION" != "$VERSION" ]; then
+          echo "❌ Version mismatch: CLI reports $CLI_VERSION, expected $VERSION"
+          exit 1
+        fi
+
+        echo "✅ CLI version matches expected: $VERSION"
+
+    - name: Test core functionality
+      run: |
+        # Test Python API
+        python -c "
+        import radiobridge
+        from radiobridge.radios import get_supported_radios, get_radio_formatter
+
+        print('Testing RadioBridge API...')
+
+        # Test radio support
+        radios = get_supported_radios()
+        print(f'Supported radios: {len(radios)}')
+        assert len(radios) > 0, 'No radios found'
+
+        # Test formatter loading
+        formatter = get_radio_formatter('anytone-878')
+        assert formatter is not None, 'Could not load anytone-878 formatter'
+        print(f'Formatter name: {formatter.radio_name}')
+
+        print('✅ Core functionality tests passed')
+        "
+
+    - name: Test with sample data
+      run: |
+        # Create a simple test CSV
+        python -c "
+        import pandas as pd
+        import tempfile
+        import os
+        from radiobridge.radios import get_radio_formatter
+
+        print('Testing with sample data...')
+
+        # Create sample data
+        data = pd.DataFrame({
+            'frequency': ['146.520', '147.000', '440.000'],
+            'callsign': ['W6ABC', 'K6DEF', 'N6GHI'],
+            'location': ['Los Angeles', 'San Diego', 'San Francisco'],
+            'tone': ['88.5', '100.0', '136.5']
+        })
+
+        # Test formatting with different radios
+        for radio_id in ['anytone-878', 'baofeng-k5']:
+            formatter = get_radio_formatter(radio_id)
+            result = formatter.format(data)
+            print(f'{radio_id}: Formatted {len(result)} channels')
+            assert len(result) == 3, f'Expected 3 channels, got {len(result)}'
+
+        print('✅ Sample data test passed')
+        "
+
+  validate-github-release:
+    name: Validate GitHub Release
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Determine version and tag
+      id: version
+      run: |
+        if [ "${{ github.event_name }}" = "release" ]; then
+          VERSION="${{ github.event.release.tag_name }}"
+          TAG="${{ github.event.release.tag_name }}"
+          VERSION_CLEAN="${VERSION#v}"
+        else
+          VERSION_CLEAN="${{ github.event.inputs.version }}"
+          TAG="v$VERSION_CLEAN"
+          VERSION="v$VERSION_CLEAN"
+        fi
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        echo "tag=$TAG" >> $GITHUB_OUTPUT
+        echo "version_clean=$VERSION_CLEAN" >> $GITHUB_OUTPUT
+        echo "Testing GitHub release: $TAG"
+
+    - name: Check release exists
+      run: |
+        TAG="${{ steps.version.outputs.tag }}"
+
+        # Check if release exists
+        if ! curl -f -s "https://api.github.com/repos/${{ github.repository }}/releases/tags/$TAG" > /dev/null; then
+          echo "❌ Release $TAG not found"
+          exit 1
+        fi
+
+        echo "✅ Release $TAG exists"
+
+    - name: Download and validate release assets
+      run: |
+        TAG="${{ steps.version.outputs.tag }}"
+        VERSION_CLEAN="${{ steps.version.outputs.version_clean }}"
+
+        # Create temp directory
+        mkdir -p release-assets
+        cd release-assets
+
+        # Download release assets
+        echo "Downloading release assets for $TAG..."
+        curl -L -H "Accept: application/vnd.github.v3+json" \
+             "https://api.github.com/repos/${{ github.repository }}/releases/tags/$TAG" \
+             > release_info.json
+
+        # Check if assets exist
+        ASSET_COUNT=$(jq '.assets | length' release_info.json)
+        echo "Found $ASSET_COUNT release assets"
+
+        if [ "$ASSET_COUNT" -eq 0 ]; then
+          echo "⚠️ No release assets found, but this might be expected for source-only releases"
+        else
+          # Download and validate wheel and tarball
+          jq -r '.assets[] | "\(.name) \(.browser_download_url)"' release_info.json | while read -r name url; do
+            echo "Downloading $name..."
+            curl -L -o "$name" "$url"
+
+            # Basic validation
+            if [ ! -s "$name" ]; then
+              echo "❌ Asset $name is empty"
+              exit 1
+            fi
+
+            echo "✅ Asset $name downloaded successfully ($(stat -f%z "$name" 2>/dev/null || stat -c%s "$name" 2>/dev/null) bytes)"
+          done
+        fi
+
+    - name: Validate source distribution
+      run: |
+        TAG="${{ steps.version.outputs.tag }}"
+
+        # Download source tarball
+        curl -L -o source.tar.gz "https://github.com/${{ github.repository }}/archive/refs/tags/$TAG.tar.gz"
+
+        # Extract and validate
+        tar -xzf source.tar.gz
+        cd radiobridge-*
+
+        # Check key files exist
+        for file in pyproject.toml README.md src/radiobridge/__init__.py; do
+          if [ ! -f "$file" ]; then
+            echo "❌ Missing required file: $file"
+            exit 1
+          fi
+        done
+
+        echo "✅ Source distribution contains required files"
+
+  report-validation-results:
+    name: Report Validation Results
+    runs-on: ubuntu-latest
+    needs: [validate-pypi-release, validate-github-release]
+    if: always()
+
+    steps:
+    - name: Determine version
+      id: version
+      run: |
+        if [ "${{ github.event_name }}" = "release" ]; then
+          VERSION="${{ github.event.release.tag_name }}"
+        else
+          VERSION="v${{ github.event.inputs.version }}"
+        fi
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+    - name: Generate validation report
+      run: |
+        VERSION="${{ steps.version.outputs.version }}"
+
+        echo "## 🔍 Release Validation Report for $VERSION" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+
+        if [ "${{ needs.validate-pypi-release.result }}" = "success" ]; then
+          echo "✅ **PyPI Installation**: All platforms and Python versions working" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "❌ **PyPI Installation**: Some tests failed" >> $GITHUB_STEP_SUMMARY
+        fi
+
+        if [ "${{ needs.validate-github-release.result }}" = "success" ]; then
+          echo "✅ **GitHub Release**: Release assets and metadata validated" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "❌ **GitHub Release**: Validation failed" >> $GITHUB_STEP_SUMMARY
+        fi
+
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Test Matrix Results" >> $GITHUB_STEP_SUMMARY
+        echo "- **Platforms Tested**: Ubuntu, Windows, macOS" >> $GITHUB_STEP_SUMMARY
+        echo "- **Python Versions**: 3.9, 3.11, 3.13" >> $GITHUB_STEP_SUMMARY
+        echo "- **Total Test Combinations**: 9" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+
+        if [ "${{ needs.validate-pypi-release.result }}" = "success" ] && [ "${{ needs.validate-github-release.result }}" = "success" ]; then
+          echo "🎉 **Overall Status**: ✅ PASSED - Release $VERSION is ready for use!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Installation:** \`pip install radiobridge==${VERSION#v}\`" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "⚠️ **Overall Status**: ❌ FAILED - Release $VERSION has validation issues" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Please check the individual job logs for details." >> $GITHUB_STEP_SUMMARY
+        fi

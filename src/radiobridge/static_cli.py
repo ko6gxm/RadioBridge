@@ -1,8 +1,8 @@
 """Command-line interface for static frequency list generation.
 
 DEPRECATED: This module is deprecated. Use the main CLI instead:
-- ham-formatter list-static
-- ham-formatter generate-static
+- radiobridge list-static
+- radiobridge generate-static
 
 This module is kept for backward compatibility.
 """
@@ -11,8 +11,6 @@ import argparse
 import sys
 import warnings
 from typing import List, Optional
-
-import pandas as pd
 
 from radiobridge.static_commands import (
     list_available_static_lists,
@@ -34,13 +32,15 @@ Examples:
   python -m radiobridge.static_cli national_calling -o calling_freqs.csv
 
   # Generate only 2m and 70cm calling frequencies
-  python -m radiobridge.static_cli national_calling --bands 2m 70cm -o calling_freqs.csv
+  python -m radiobridge.static_cli national_calling --bands 2m 70cm \
+    -o calling_freqs.csv
 
   # Generate emergency simplex frequencies
   python -m radiobridge.static_cli emergency_simplex -o emergency_freqs.csv
 
   # Generate multiple lists combined
-  python -m radiobridge.static_cli national_calling emergency_simplex -o combined_freqs.csv
+  python -m radiobridge.static_cli national_calling emergency_simplex \
+    -o combined_freqs.csv
 
   # List available static frequency lists
   python -m radiobridge.static_cli --list
@@ -140,11 +140,11 @@ def save_output(data: dict, output_path: Optional[str], separate: bool) -> None:
 
 
 def main() -> int:
-    """Main CLI entry point."""
+    """Run the main CLI entry point."""
     # Issue deprecation warning
     warnings.warn(
         "The 'python -m radiobridge.static_cli' interface is deprecated. "
-        "Use 'ham-formatter list-static' and 'ham-formatter generate-static' instead.",
+        "Use 'radiobridge list-static' and 'radiobridge generate-static' instead.",
         DeprecationWarning,
         stacklevel=2,
     )

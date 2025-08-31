@@ -1,10 +1,10 @@
-# Ham Formatter Architecture
+# RadioBridge Architecture
 
-This document explains the architecture and design decisions of the Ham Formatter project.
+This document explains the architecture and design decisions of the RadioBridge project.
 
 ## Overview
 
-Ham Formatter is designed as a modular, extensible system for downloading and formatting amateur radio repeater data. The architecture follows these key principles:
+RadioBridge is designed as a modular, extensible system for downloading and formatting amateur radio repeater data. The architecture follows these key principles:
 
 - **Separation of Concerns**: Each module has a single responsibility
 - **Extensibility**: Easy to add new radio formatters
@@ -15,12 +15,12 @@ Ham Formatter is designed as a modular, extensible system for downloading and fo
 
 ### Core Modules
 
-#### `ham_formatter/__init__.py`
+#### `radiobridge/__init__.py`
 - **Purpose**: Public API entry point
 - **Exports**: Key functions for library users
 - **Dependencies**: None (imports from submodules)
 
-#### `ham_formatter/cli.py`
+#### `radiobridge/cli.py`
 - **Purpose**: Command-line interface implementation
 - **Framework**: Click for argument parsing and command structure
 - **Commands**:
@@ -29,7 +29,7 @@ Ham Formatter is designed as a modular, extensible system for downloading and fo
   - `list-radios`: Show supported radio models
 - **Dependencies**: Click, internal modules
 
-#### `ham_formatter/csv_utils.py`
+#### `radiobridge/csv_utils.py`
 - **Purpose**: CSV file operations and data validation
 - **Key Functions**:
   - `read_csv()`: Enhanced pandas CSV reading with error handling
@@ -38,7 +38,7 @@ Ham Formatter is designed as a modular, extensible system for downloading and fo
   - `clean_csv_data()`: Data normalization
 - **Dependencies**: Pandas, pathlib
 
-#### `ham_formatter/downloader.py`
+#### `radiobridge/downloader.py`
 - **Purpose**: Download repeater data from RepeaterBook.com
 - **Key Classes**:
   - `RepeaterBookDownloader`: Main downloader with session management
@@ -50,7 +50,7 @@ Ham Formatter is designed as a modular, extensible system for downloading and fo
 
 ### Radio Formatters Package
 
-#### `ham_formatter/radios/__init__.py`
+#### `radiobridge/radios/__init__.py`
 - **Purpose**: Formatter registry and discovery
 - **Key Functions**:
   - `get_supported_radios()`: List all supported models
@@ -59,7 +59,7 @@ Ham Formatter is designed as a modular, extensible system for downloading and fo
 - **Registry**: Maps radio names to formatter classes
 - **Aliases**: Supports multiple names for the same radio
 
-#### `ham_formatter/radios/base.py`
+#### `radiobridge/radios/base.py`
 - **Purpose**: Abstract base class for all radio formatters
 - **Key Features**:
   - Abstract interface definition

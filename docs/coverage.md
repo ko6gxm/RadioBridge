@@ -1,6 +1,6 @@
 # Test Coverage Report 📊
 
-*Comprehensive test coverage analysis for Ham Formatter*
+*Comprehensive test coverage analysis for RadioBridge*
 
 ## 📈 Current Coverage Status
 
@@ -120,7 +120,7 @@
 
 ```ini
 [tool.coverage.run]
-source = ["src/ham_formatter"]
+source = ["src/radiobridge"]
 branch = true
 omit = [
     "*/tests/*",
@@ -178,7 +178,7 @@ open htmlcov/index.html
 pipenv run pytest --cov-report=term-missing
 
 # Focus on specific module
-pipenv run pytest tests/test_radios.py --cov=ham_formatter.radios
+pipenv run pytest tests/test_radios.py --cov=radiobridge.radios
 ```
 
 ### CI Integration
@@ -214,4 +214,4 @@ pipenv run pytest --cov-report=xml
 
 **📊 Coverage data updated automatically with each test run**
 
-*This analysis helps ensure Ham Formatter remains reliable and maintainable as it grows.*
+*This analysis helps ensure RadioBridge remains reliable and maintainable as it grows.*
