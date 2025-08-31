@@ -1,6 +1,6 @@
 # GitHub Repository Setup Guide 🚀
 
-*A comprehensive guide to setting up your Ham Formatter repository on GitHub for maximum impact.*
+*A comprehensive guide to setting up your RadioBridge repository on GitHub for maximum impact.*
 
 ## 📋 Pre-Upload Checklist
 
@@ -21,7 +21,7 @@ Before uploading to GitHub, ensure you have:
 
 1. Go to [GitHub.com](https://github.com) and log in
 2. Click "New repository" (green button)
-3. Set repository name: `ham-formatter`
+3. Set repository name: `RadioBridge`
 4. Set description: `Professional Amateur Radio Repeater Programming Made Easy`
 5. Set visibility: **Public** (to showcase your work!)
 6. **Don't** initialize with README (we have our own)
@@ -32,7 +32,7 @@ Before uploading to GitHub, ensure you have:
 **Repository Settings:**
 
 ```
-Repository Name: ham-formatter
+Repository Name: RadioBridge
 Description: Professional Amateur Radio Repeater Programming Made Easy - Download and format repeater data from RepeaterBook.com for popular ham radio models
 Website: https://ko6gxm.com
 Topics: amateur-radio, ham-radio, repeater, radio-programming, python, cli-tool, dmr, anytone, baofeng
@@ -60,19 +60,19 @@ Topics: amateur-radio, ham-radio, repeater, radio-programming, python, cli-tool,
 From your local directory:
 
 ```bash
-cd /Users/craig/source_code/ham_formatter
+cd /Users/craig/source_code/RadioBridge
 
 # Initialize git repository (if not already done)
 git init
 
 # Add GitHub remote
-git remote add origin https://github.com/ko6gxm/ham-formatter.git
+git remote add origin https://github.com/ko6gxm/RadioBridge.git
 
 # Stage all files
 git add .
 
 # Make initial commit
-git commit -m "feat: initial release of Ham Formatter v0.2.0
+git commit -m "feat: initial release of RadioBridge v0.2.0
 
 - Professional amateur radio repeater programming tool
 - Support for Anytone and Baofeng radio models
@@ -95,11 +95,11 @@ git push -u origin main
 1. Go to your repository on GitHub
 2. Click "Releases" → "Create a new release"
 3. Tag version: `v0.2.0`
-4. Release title: `Ham Formatter v0.2.0 - Professional Repeater Programming`
+4. Release title: `RadioBridge v0.2.0 - Professional Repeater Programming`
 5. Description:
 
 ```markdown
-# Ham Formatter v0.2.0 🎉
+# RadioBridge v0.2.0 🎉
 
 **Professional Amateur Radio Repeater Programming Made Easy**
 
@@ -122,13 +122,13 @@ git push -u origin main
 
 ```bash
 # Install
-pip install git+https://github.com/ko6gxm/ham-formatter.git
+pip install git+https://github.com/ko6gxm/RadioBridge.git
 
 # Download repeaters for your area
-ham-formatter download --state CA --county "Orange"
+radiobridge download --state CA --county "Orange"
 
 # Format for your radio
-ham-formatter format repeaters.csv --radio anytone-878 --output programmed.csv
+radiobridge format repeaters.csv --radio anytone-878 --output programmed.csv
 ```
 
 ## 🔧 What's New
@@ -143,14 +143,14 @@ ham-formatter format repeaters.csv --radio anytone-878 --output programmed.csv
 
 ## 📖 Documentation
 
-Visit the [README](README.md) for comprehensive usage examples and the [Contributing Guide](CONTRIBUTING.md) to help improve Ham Formatter.
+Visit the [README](README.md) for comprehensive usage examples and the [Contributing Guide](CONTRIBUTING.md) to help improve RadioBridge.
 
 ## 🤝 Community
 
-Ham Formatter is built by the amateur radio community, for the amateur radio community. Join us:
+RadioBridge is built by the amateur radio community, for the amateur radio community. Join us:
 
-- 💬 [Discussions](https://github.com/ko6gxm/ham-formatter/discussions) - Ask questions and share ideas
-- 🐛 [Issues](https://github.com/ko6gxm/ham-formatter/issues) - Report bugs or request features
+- 💬 [Discussions](https://github.com/ko6gxm/RadioBridge/discussions) - Ask questions and share ideas
+- 🐛 [Issues](https://github.com/ko6gxm/RadioBridge/issues) - Report bugs or request features
 - 📧 [Email](mailto:craig@ko6gxm.com) - Direct contact for urgent matters
 - 🌐 [Website](https://ko6gxm.com) - More amateur radio tools and tutorials
 
@@ -181,7 +181,7 @@ After your first push, set up branch protection:
 1. Go to Settings → General → Features
 2. Enable "Discussions"
 3. Create welcome categories:
-   - 🎯 General - General discussion about Ham Formatter
+   - 🎯 General - General discussion about RadioBridge
    - 💡 Ideas - Feature suggestions and improvements
    - 🙋 Q&A - Questions and troubleshooting help
    - 📡 Radio Support - Discuss new radio models
@@ -189,7 +189,7 @@ After your first push, set up branch protection:
 
 **Projects:**
 1. Go to Projects tab
-2. Create "Ham Formatter Development"
+2. Create "RadioBridge Development"
 3. Add columns: Backlog, In Progress, Review, Done
 4. Link to milestone tracking
 
@@ -229,9 +229,9 @@ csv-formatter
 Your README already includes professional badges. Consider adding:
 
 ```markdown
-[![GitHub stars](https://img.shields.io/github/stars/ko6gxm/ham-formatter?style=social)](https://github.com/ko6gxm/ham-formatter/stargazers)
-[![GitHub forks](https://img.shields.io/github/forks/ko6gxm/ham-formatter?style=social)](https://github.com/ko6gxm/ham-formatter/network)
-[![GitHub watchers](https://img.shields.io/github/watchers/ko6gxm/ham-formatter?style=social)](https://github.com/ko6gxm/ham-formatter/watchers)
+[![GitHub stars](https://img.shields.io/github/stars/ko6gxm/RadioBridge?style=social)](https://github.com/ko6gxm/RadioBridge/stargazers)
+[![GitHub forks](https://img.shields.io/github/forks/ko6gxm/RadioBridge?style=social)](https://github.com/ko6gxm/RadioBridge/network)
+[![GitHub watchers](https://img.shields.io/github/watchers/ko6gxm/RadioBridge?style=social)](https://github.com/ko6gxm/RadioBridge/watchers)
 ```
 
 ### Social Proof Elements
@@ -239,7 +239,7 @@ Your README already includes professional badges. Consider adding:
 - **Contributors section** in README
 - **User testimonials** (collect over time)
 - **Download/usage statistics**
-- **Community showcase** of projects using Ham Formatter
+- **Community showcase** of projects using RadioBridge
 
 ### SEO Optimization
 
@@ -277,7 +277,7 @@ Your README already includes professional badges. Consider adding:
 - Create helpful tutorial content
 
 ### Amateur Radio Community Presence
-- **QRZ.com profile**: Link to Ham Formatter
+- **QRZ.com profile**: Link to RadioBridge
 - **ARRL forums**: Share in appropriate sections
 - **Local amateur radio clubs**: Present at meetings
 - **Hamfests and conventions**: Demo the tool
@@ -294,7 +294,7 @@ Track these metrics to measure impact:
 
 ## 🎯 Goal: Professional Impact
 
-Your Ham Formatter project showcases:
+Your RadioBridge project showcases:
 
 - ✅ **Technical Excellence**: Clean code, comprehensive testing
 - ✅ **Professional Documentation**: Clear, helpful, comprehensive
@@ -302,13 +302,13 @@ Your Ham Formatter project showcases:
 - ✅ **Open Source Leadership**: Welcoming contributor environment
 - ✅ **Real-World Impact**: Solving actual problems for users
 
-This combination makes Ham Formatter an excellent portfolio project that demonstrates your software development skills, community leadership, and domain expertise in amateur radio.
+This combination makes RadioBridge an excellent portfolio project that demonstrates your software development skills, community leadership, and domain expertise in amateur radio.
 
 ---
 
 **🎉 Ready to Launch!**
 
-Your Ham Formatter project is now ready to make a significant impact in the amateur radio community. The professional documentation, comprehensive testing, and community-focused approach will help it stand out as a high-quality open source project.
+Your RadioBridge project is now ready to make a significant impact in the amateur radio community. The professional documentation, comprehensive testing, and community-focused approach will help it stand out as a high-quality open source project.
 
 **73 and good luck with the launch!**
 *Time to show the world what KO6GXM can build! 📻*

@@ -27,7 +27,7 @@ class RepeaterBookDownloader:
         self.timeout = timeout
         self.session = requests.Session()
         self.session.headers.update(
-            {"User-Agent": "ham-formatter/0.2.0 (Amateur Radio Tool)"}
+            {"User-Agent": "radiobridge/0.2.0 (Amateur Radio Tool)"}
         )
         self.logger = get_logger(__name__)
         self.logger.debug(f"RepeaterBookDownloader initialized with timeout={timeout}s")

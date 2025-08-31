@@ -7,12 +7,7 @@ import pandas as pd
 import pytest
 import responses
 
-from radiobridge.downloader import (
-    RepeaterBookDownloader,
-    download_repeater_data,
-    download_repeater_data_by_county,
-    download_repeater_data_by_city,
-)
+from radiobridge.downloader import RepeaterBookDownloader
 from radiobridge.detailed_downloader import (
     download_with_details,
     download_with_details_by_county,
@@ -30,7 +25,7 @@ class TestRepeaterBookDownloader:
         assert downloader.BASE_URL == "https://www.repeaterbook.com"
         assert (
             downloader.session.headers["User-Agent"]
-            == "ham-formatter/0.2.0 (Amateur Radio Tool)"
+            == "radiobridge/0.2.0 (Amateur Radio Tool)"
         )
 
     def test_build_params_state(self):
