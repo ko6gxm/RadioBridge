@@ -17,11 +17,7 @@ from radiobridge.csv_utils import (
     write_csv_with_comments,
     read_csv_comments,
 )
-from radiobridge.downloader import (
-    download_repeater_data,
-    download_repeater_data_by_county,
-    download_repeater_data_by_city,
-)
+# Unused imports removed for linting compliance
 from radiobridge.detailed_downloader import (
     download_with_details,
     download_with_details_by_county,

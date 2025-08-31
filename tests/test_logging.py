@@ -167,9 +167,7 @@ class TestCLILogging:
 
         with caplog.at_level(logging.INFO):
             with patch("radiobridge.cli.read_csv") as mock_read:
-                with patch(
-                    "radiobridge.cli.get_radio_formatter"
-                ) as mock_get_formatter:
+                with patch("radiobridge.cli.get_radio_formatter") as mock_get_formatter:
                     with patch("radiobridge.cli.write_csv"):
 
                         # Set up mocks
