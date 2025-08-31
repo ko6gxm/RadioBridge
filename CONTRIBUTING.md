@@ -111,7 +111,7 @@ Ready to write code? Awesome!
 
 ```bash
 # Fork the repository on GitHub, then:
-git clone https://github.com/YOUR_USERNAME/radiobridge.git
+git clone https://github.com/yourusername/radiobridge.git
 cd radiobridge
 ```
 
