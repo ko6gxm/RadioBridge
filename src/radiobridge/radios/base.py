@@ -510,7 +510,8 @@ class BaseRadioFormatter(ABC):
 
         Args:
             formatted_data: DataFrame with formatted channel information
-            csv_metadata: Metadata from CSV comments (contains county, state, city, etc.)
+            csv_metadata: Metadata from CSV comments (contains county, state,
+                city, etc.)
             zone_strategy: Strategy for creating zones ('location', 'band', 'service')
             max_zones: Maximum number of zones to create
             max_channels_per_zone: Maximum channels per zone
@@ -612,7 +613,8 @@ class BaseRadioFormatter(ABC):
         for supported in supported_versions:
             supported_lower = supported.lower()
 
-            # Handle CHIRP-style matching (user says "CHIRP next DATE" matches "CHIRP_next_DATE1_DATE2")
+            # Handle CHIRP-style matching (user says "CHIRP next DATE"
+            # matches "CHIRP_next_DATE1_DATE2")
             if "chirp" in cps_lower and "chirp" in supported_lower:
                 # Extract date from user input if present
                 user_words = cps_lower.split()
