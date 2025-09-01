@@ -50,11 +50,10 @@ class BaofengDM32UVFormatter(BaseRadioFormatter):
                 manufacturer="Baofeng",
                 model="DM-32UV",
                 radio_version="Standard",
-                firmware_versions=["2.14", "2.13", "2.12", "2.10", "2.09", "2.08"],
+                firmware_versions=["v.046"],
                 cps_versions=[
-                    "DM_32UV_CPS_2.08_2.14",
                     "CHIRP_next_20240301_20250401",
-                    "OpenGD77_CPS_4.2.0_4.3.0",
+                    "DM_32UV_CPS_2.08_2.14",
                 ],
                 formatter_key="baofeng-dm32uv",
             ),
@@ -80,11 +79,10 @@ class BaofengDM32UVFormatter(BaseRadioFormatter):
                 manufacturer="Baofeng",
                 model="DM-32UV",
                 radio_version="Standard",
-                firmware_versions=["2.14", "2.13", "2.12", "2.10", "2.09", "2.08"],
+                firmware_versions=["v.046"],
                 cps_versions=[
-                    "DM_32UV_CPS_2.08_2.14",
                     "CHIRP_next_20240301_20250401",
-                    "OpenGD77_CPS_4.2.0_4.3.0",
+                    "DM_32UV_CPS_2.08_2.14",
                 ],
                 formatter_key="baofeng-dm32uv",
                 # Enhanced metadata

@@ -6,6 +6,13 @@ import pandas as pd
 
 from .base import BaseRadioFormatter
 from .metadata import RadioMetadata
+from .enhanced_metadata import (
+    EnhancedRadioMetadata,
+    FormFactor,
+    BandCount,
+    FrequencyRange,
+    PowerLevel,
+)
 
 
 class BaofengUV5RMFormatter(BaseRadioFormatter):
@@ -46,23 +53,67 @@ class BaofengUV5RMFormatter(BaseRadioFormatter):
                 manufacturer="Baofeng",
                 model="UV-5RM",
                 radio_version="Standard",
-                firmware_versions=[
-                    "UV5RM-298",
-                    "UV5RM-297",
-                    "UV5RM-296",
-                    "BFB298-RM",
-                    "BFB297-RM",
-                    "BFB296-RM",
-                    "N5RM-298",
-                    "N5RM-297",
-                ],
+                firmware_versions=[],  # UV-5RM firmware is not upgradable
                 cps_versions=[
                     "CHIRP_next_20240301_20250401",
-                    "RT_Systems_UV5RM_1.0_2.3",
-                    "Baofeng_UV5RM_CPS_1.0_2.0",
-                    "BaoFeng_CPS_5.5_6.8",
+                    "Baofeng_UV5RM_CPS_2.1_3.5",
                 ],
                 formatter_key="baofeng-uv5rm",
+            ),
+        ]
+
+    @property
+    def enhanced_metadata(self) -> List[EnhancedRadioMetadata]:
+        """Enhanced radio metadata with comprehensive specifications."""
+        # Frequency ranges for UV-5RM (dual-band handheld radio)
+        frequency_ranges = [
+            FrequencyRange(
+                band_name="VHF",
+                min_freq_mhz=136.0,
+                max_freq_mhz=174.0,
+                step_size_khz=12.5,
+            ),  # 2m band
+            FrequencyRange(
+                band_name="UHF",
+                min_freq_mhz=400.0,
+                max_freq_mhz=520.0,
+                step_size_khz=12.5,
+            ),  # 70cm band
+        ]
+
+        # Power levels for dual-band handheld radio
+        power_levels = [
+            PowerLevel(name="Low", power_watts=1.0, bands=["VHF", "UHF"]),
+            PowerLevel(name="High", power_watts=8.0, bands=["VHF", "UHF"]),
+        ]
+
+        return [
+            EnhancedRadioMetadata(
+                manufacturer="Baofeng",
+                model="UV-5RM",
+                radio_version="Standard",
+                firmware_versions=[],  # UV-5RM firmware is not upgradable
+                cps_versions=[
+                    "CHIRP_next_20240301_20250401",
+                    "Baofeng_UV5RM_CPS_2.1_3.5",
+                ],
+                formatter_key="baofeng-uv5rm",
+                # Enhanced metadata
+                form_factor=FormFactor.HANDHELD,
+                band_count=BandCount.DUAL_BAND,  # VHF and UHF
+                max_power_watts=8.0,
+                frequency_ranges=frequency_ranges,
+                power_levels=power_levels,
+                modulation_modes=["FM"],
+                digital_modes=[],  # Analog only
+                memory_channels=999,
+                gps_enabled=False,
+                bluetooth_enabled=False,
+                display_type="LCD",
+                antenna_connector="SMA-Female",
+                dimensions_mm=(58, 110, 32),
+                weight_grams=250,
+                target_markets=["Amateur"],
             ),
         ]
 

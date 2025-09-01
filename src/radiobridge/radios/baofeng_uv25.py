@@ -6,6 +6,13 @@ import pandas as pd
 
 from .base import BaseRadioFormatter
 from .metadata import RadioMetadata
+from .enhanced_metadata import (
+    EnhancedRadioMetadata,
+    FormFactor,
+    BandCount,
+    FrequencyRange,
+    PowerLevel,
+)
 
 
 class BaofengUV25Formatter(BaseRadioFormatter):
@@ -14,8 +21,8 @@ class BaofengUV25Formatter(BaseRadioFormatter):
     This formatter converts repeater data into the CSV format expected by
     the Baofeng UV-25 programming software or CHIRP.
 
-    The UV-25 is a compact dual-band handheld radio that supports VHF (136-174 MHz)
-    and UHF (400-520 MHz) bands with analog FM operation and updated features.
+    The UV-25 is a compact tri-band handheld radio that supports VHF (136-174 MHz),
+    UHF (400-520 MHz), and 220MHz (200-260 MHz) bands with analog FM operation and updated features.
     """
 
     @property
@@ -26,9 +33,7 @@ class BaofengUV25Formatter(BaseRadioFormatter):
     @property
     def description(self) -> str:
         """Description of the radio and its capabilities."""
-        return (
-            "Compact dual-band handheld radio with updated features and VHF/UHF support"
-        )
+        return "Compact tri-band handheld radio with updated features and VHF/UHF/220MHz support"
 
     @property
     def manufacturer(self) -> str:
@@ -48,21 +53,73 @@ class BaofengUV25Formatter(BaseRadioFormatter):
                 manufacturer="Baofeng",
                 model="UV-25",
                 radio_version="Standard",
-                firmware_versions=[
-                    "UV25-298",
-                    "UV25-297",
-                    "UV25-296",
-                    "BFB298-25",
-                    "BFB297-25",
-                    "BFB296-25",
-                ],
+                firmware_versions=[],  # UV-25 firmware is not upgradable
                 cps_versions=[
                     "CHIRP_next_20240301_20250401",
-                    "RT_Systems_UV25_1.0_2.1",
                     "Baofeng_UV25_CPS_1.0_1.5",
-                    "BaoFeng_CPS_6.0_7.2",
                 ],
                 formatter_key="baofeng-uv25",
+            ),
+        ]
+
+    @property
+    def enhanced_metadata(self) -> List[EnhancedRadioMetadata]:
+        """Enhanced radio metadata with comprehensive specifications."""
+        # Frequency ranges for UV-25 (tri-band handheld radio)
+        frequency_ranges = [
+            FrequencyRange(
+                band_name="VHF",
+                min_freq_mhz=136.0,
+                max_freq_mhz=174.0,
+                step_size_khz=12.5,
+            ),  # 2m band
+            FrequencyRange(
+                band_name="220MHz",
+                min_freq_mhz=200.0,
+                max_freq_mhz=260.0,
+                step_size_khz=12.5,
+            ),  # 1.25m band
+            FrequencyRange(
+                band_name="UHF",
+                min_freq_mhz=400.0,
+                max_freq_mhz=520.0,
+                step_size_khz=12.5,
+            ),  # 70cm band
+        ]
+
+        # Power levels for tri-band handheld radio
+        power_levels = [
+            PowerLevel(name="Low", power_watts=1.0, bands=["VHF", "220MHz", "UHF"]),
+            PowerLevel(name="High", power_watts=8.0, bands=["VHF", "220MHz", "UHF"]),
+        ]
+
+        return [
+            EnhancedRadioMetadata(
+                manufacturer="Baofeng",
+                model="UV-25",
+                radio_version="Standard",
+                firmware_versions=[],  # UV-25 firmware is not upgradable
+                cps_versions=[
+                    "CHIRP_next_20240301_20250401",
+                    "Baofeng_UV25_CPS_1.0_1.5",
+                ],
+                formatter_key="baofeng-uv25",
+                # Enhanced metadata
+                form_factor=FormFactor.HANDHELD,
+                band_count=BandCount.TRI_BAND,  # VHF, 220MHz, and UHF
+                max_power_watts=8.0,
+                frequency_ranges=frequency_ranges,
+                power_levels=power_levels,
+                modulation_modes=["FM"],
+                digital_modes=[],  # Analog only
+                memory_channels=999,
+                gps_enabled=False,
+                bluetooth_enabled=False,
+                display_type="LCD",
+                antenna_connector="SMA-Female",
+                dimensions_mm=(58, 110, 32),
+                weight_grams=220,
+                target_markets=["Amateur"],
             ),
         ]
 

@@ -481,14 +481,51 @@ def format(
 
 
 @main.command("list-radios")
-def list_radios() -> None:
-    """List all supported radio models with numbered options."""
+@click.option(
+    "-o",
+    "--output",
+    type=click.Choice(["default", "wide"]),
+    default="default",
+    help="Output format: 'default' for standard view, 'wide' for enhanced metadata",
+)
+def list_radios(output: str) -> None:
+    """List all supported radio models with numbered options.
+
+    Use -o wide to display enhanced metadata including form factor and band support.
+    """
     options = list_radio_options()
 
     if not options:
         click.echo("No supported radios found.")
         return
 
+    if output == "wide":
+        _display_radios_wide(options)
+    else:
+        _display_radios_default(options)
+
+    # Usage examples
+    click.echo("\n" + click.style("Usage Examples:", fg="cyan", bold=True))
+    click.echo(
+        click.style("  By number: ", fg="white", bold=True)
+        + click.style("rb format input.csv --radio 1", fg="green")
+    )
+    click.echo(
+        click.style("  By name:   ", fg="white", bold=True)
+        + click.style("rb format input.csv --radio anytone-878", fg="green")
+    )
+
+    # Additional info
+    click.echo(
+        "\n"
+        + click.style("💡 Tip: ", fg="yellow", bold=True)
+        + "Use numbers for quick selection or names for scripts"
+    )
+    click.echo("")
+
+
+def _display_radios_default(options) -> None:
+    """Display radios in default format (original layout)."""
     # Print header with styling
     click.echo(
         click.style("\nRadioBridge - Supported Radio Models", fg="cyan", bold=True)
@@ -496,18 +533,19 @@ def list_radios() -> None:
     click.echo(click.style("=" * 50, fg="cyan"))
 
     # Table headers with better spacing
-    header = (
-        f"{'#':<3} {'Mfg':<8} {'Model':<22} {'Version':<9} {'Firmware':<16} {'CPS'}"
-    )
+    header = f"{'#':<3} {'Mfg':<8} {'Model':<22} {'Ver':<9} {'Firmware':<16} {'CPS'}"
     click.echo(click.style(header, fg="yellow", bold=True))
     click.echo(click.style("-" * 85, fg="yellow"))
 
     # Table rows
     for index, metadata in options:
         # Format firmware versions (limit to first 2 for display)
-        fw_display = ", ".join(metadata.firmware_versions[:2])
-        if len(metadata.firmware_versions) > 2:
-            fw_display += "+"
+        if metadata.firmware_versions:
+            fw_display = ", ".join(metadata.firmware_versions[:2])
+            if len(metadata.firmware_versions) > 2:
+                fw_display += "+"
+        else:
+            fw_display = "Unknown"
 
         # Format CPS versions using the metadata's display formatting
         cps_display = metadata._format_cps_display()
@@ -551,24 +589,139 @@ def list_radios() -> None:
 
         click.echo(" ".join(parts))
 
-    # Usage examples
-    click.echo("\n" + click.style("Usage Examples:", fg="cyan", bold=True))
-    click.echo(
-        click.style("  By number: ", fg="white", bold=True)
-        + click.style("rb format input.csv --radio 1", fg="green")
-    )
-    click.echo(
-        click.style("  By name:   ", fg="white", bold=True)
-        + click.style("rb format input.csv --radio anytone-878", fg="green")
-    )
 
-    # Additional info
-    click.echo(
-        "\n"
-        + click.style("💡 Tip: ", fg="yellow", bold=True)
-        + "Use numbers for quick selection or names for scripts"
-    )
-    click.echo("")
+def _display_radios_wide(options) -> None:
+    """Display radios in wide format with enhanced metadata."""
+    import logging
+    from radiobridge.radios import get_radio_formatter
+
+    # Temporarily suppress INFO logging to avoid cluttering output
+    logger = logging.getLogger("radiobridge.radios")
+    original_level = logger.level
+    logger.setLevel(logging.WARNING)
+
+    try:
+        # Print header with styling
+        click.echo(
+            click.style(
+                "\nRadioBridge - Supported Radio Models (Enhanced View)",
+                fg="cyan",
+                bold=True,
+            )
+        )
+        click.echo(click.style("=" * 90, fg="cyan"))
+
+        # Wide table headers with enhanced metadata
+        header = (
+            f"{'#':<3} {'Mfg':<8} {'Model':<18} {'Ver':<4} "
+            f"{'Form':<9} {'Bands':<11} {'Power':<6} {'Digital':<8}"
+        )
+        click.echo(click.style(header, fg="yellow", bold=True))
+        click.echo(click.style("-" * 90, fg="yellow"))
+
+        # Table rows with enhanced metadata
+        for index, metadata in options:
+            # Get formatter to access enhanced metadata
+            formatter = get_radio_formatter(metadata.formatter_key)
+
+            # Default values in case enhanced metadata is not available
+            form_factor = "Unknown"
+            band_count = "Unknown"
+            max_power = "?"
+            digital_modes = "-"
+
+            # Try to get enhanced metadata if available
+            if formatter and hasattr(formatter, "enhanced_metadata"):
+                try:
+                    enhanced = formatter.enhanced_metadata[0]  # Get first variant
+                    form_factor = enhanced.form_factor.value
+                    band_count = enhanced.band_count.value
+                    # Use g format to remove trailing .0
+                    max_power = f"{enhanced.max_power_watts:g}W"
+                    if enhanced.digital_modes:
+                        digital_modes = ",".join(enhanced.digital_modes)
+                    else:
+                        digital_modes = "Analog"
+                except (AttributeError, IndexError):
+                    # Fall back to defaults if enhanced metadata not available
+                    pass
+
+            # Color coding by manufacturer
+            if metadata.manufacturer == "Anytone":
+                mfg_color = "green"
+            elif metadata.manufacturer == "Baofeng":
+                mfg_color = "blue"
+            else:
+                mfg_color = "white"
+
+            # Truncate model name for wide display
+            model_display = metadata.model[:16]
+            if len(metadata.model) > 16:
+                model_display = metadata.model[:14] + ".."
+
+            # Format version short
+            version_display = metadata.radio_version
+            if version_display == "Standard":
+                version_display = "Std"
+            elif version_display == "Plus":
+                version_display = "Plus"
+            version_display = version_display[:4]
+
+            # Truncate form factor and band count for display
+            form_factor_display = form_factor[:8]
+            if form_factor == "Handheld":
+                form_factor_display = "Handheld"
+            elif form_factor == "Mobile":
+                form_factor_display = "Mobile"
+            elif form_factor == "Base Station":
+                form_factor_display = "Base"
+
+            band_display = band_count[:10]
+            if band_count == "Single Band":
+                band_display = "Single"
+            elif band_count == "Dual Band":
+                band_display = "Dual"
+            elif band_count == "Tri Band":
+                band_display = "Tri"
+            elif band_count == "Multi Band":
+                band_display = "Multi"
+
+            # Truncate digital modes for display
+            digital_display = digital_modes[:7]
+            if len(digital_modes) > 7:
+                digital_display = digital_modes[:6] + "+"
+
+            # Create the row with proper color formatting
+            parts = [
+                click.style(f"{index:<3}", fg="cyan", bold=True),
+                click.style(f"{metadata.manufacturer:<8}", fg=mfg_color),
+                f"{model_display:<18}",
+                f"{version_display:<4}",
+                f"{form_factor_display:<9}",
+                f"{band_display:<11}",
+                f"{max_power:<6}",
+                f"{digital_display:<8}",
+            ]
+
+            click.echo(" ".join(parts))
+
+        # Add legend for wide format
+        click.echo("\n" + click.style("Legend:", fg="cyan", bold=True))
+        click.echo(
+            click.style("  Form: ", fg="white", bold=True)
+            + "Handheld, Mobile, Base (station)"
+        )
+        click.echo(
+            click.style("  Bands: ", fg="white", bold=True)
+            + "Single, Dual, Tri, Multi (band support)"
+        )
+        click.echo(
+            click.style("  Digital: ", fg="white", bold=True)
+            + "DMR, D-STAR, P25 or Analog-only"
+        )
+    finally:
+        # Restore original logging level
+        logger.setLevel(original_level)
 
 
 if __name__ == "__main__":

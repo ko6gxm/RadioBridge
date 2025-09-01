@@ -15,11 +15,11 @@ from .enhanced_metadata import (
 )
 
 
-class BaofengK5Formatter(BaseRadioFormatter):
+class BaofengK5PlusFormatter(BaseRadioFormatter):
     """Formatter for Baofeng K5 Plus handheld radio.
 
     This formatter converts repeater data into the CSV format expected by
-    the Baofeng K5 programming software.
+    the Baofeng K5 Plus programming software.
     """
 
     @property
@@ -30,7 +30,7 @@ class BaofengK5Formatter(BaseRadioFormatter):
     @property
     def description(self) -> str:
         """Description of the radio and its capabilities."""
-        return "Compact single-band VHF analog handheld radio"
+        return "Compact tri-band analog handheld radio (VHF/UHF/220MHz)"
 
     @property
     def manufacturer(self) -> str:
@@ -48,21 +48,12 @@ class BaofengK5Formatter(BaseRadioFormatter):
         return [
             RadioMetadata(
                 manufacturer="Baofeng",
-                model="K5",
+                model="K5 Plus",
                 radio_version="Standard",
-                firmware_versions=[
-                    "v2.0.1.26",
-                    "v2.0.1.23",
-                    "v2.0.0.22",
-                    "v1.9.0.26",
-                    "v1.8.3.26",
-                    "v1.8.2.26",
-                ],
+                firmware_versions=[],  # K5 Plus firmware is not upgradable
                 cps_versions=[
-                    "K5_CPS_2.0.3_2.1.8",
                     "CHIRP_next_20240301_20250401",
-                    "Baofeng_CPS_K5_1.2_2.0",
-                    "OpenGD77_CPS_4.2.0_4.3.2",
+                    "K5_CPS_2.0.3_2.1.8",
                 ],
                 formatter_key="baofeng-k5",
             ),
@@ -71,41 +62,52 @@ class BaofengK5Formatter(BaseRadioFormatter):
     @property
     def enhanced_metadata(self) -> List[EnhancedRadioMetadata]:
         """Enhanced radio metadata with comprehensive specifications."""
-        # Frequency ranges for K5 (VHF only for TX, VHF+UHF for RX)
+        # Frequency ranges for K5 Plus (tri-band radio)
         frequency_ranges = [
-            FrequencyRange("VHF", 136.0, 174.0, 12.5),
-            FrequencyRange("UHF", 400.0, 520.0, 12.5, rx_only=True),  # RX only
+            FrequencyRange(
+                band_name="VHF High",
+                min_freq_mhz=136.0,
+                max_freq_mhz=174.0,
+                step_size_khz=12.5,
+            ),  # 2m band
+            FrequencyRange(
+                band_name="UHF",
+                min_freq_mhz=400.0,
+                max_freq_mhz=520.0,
+                step_size_khz=12.5,
+            ),  # 70cm band
+            FrequencyRange(
+                band_name="220MHz",
+                min_freq_mhz=200.0,
+                max_freq_mhz=260.0,
+                step_size_khz=12.5,
+            ),  # 1.25m band
         ]
 
-        # Power levels for single-band handheld radio
+        # Power levels for tri-band handheld radio
         power_levels = [
-            PowerLevel("Low", 1.0, ["VHF"]),
-            PowerLevel("High", 5.0, ["VHF"]),
+            PowerLevel(
+                name="Low", power_watts=1.0, bands=["VHF High", "UHF", "220MHz"]
+            ),
+            PowerLevel(
+                name="High", power_watts=5.0, bands=["VHF High", "UHF", "220MHz"]
+            ),
         ]
 
         return [
             EnhancedRadioMetadata(
                 manufacturer="Baofeng",
-                model="K5",
+                model="K5 Plus",
                 radio_version="Standard",
-                firmware_versions=[
-                    "v2.0.1.26",
-                    "v2.0.1.23",
-                    "v2.0.0.22",
-                    "v1.9.0.26",
-                    "v1.8.3.26",
-                    "v1.8.2.26",
-                ],
+                firmware_versions=[],  # K5 Plus firmware is not upgradable
                 cps_versions=[
-                    "K5_CPS_2.0.3_2.1.8",
                     "CHIRP_next_20240301_20250401",
-                    "Baofeng_CPS_K5_1.2_2.0",
-                    "OpenGD77_CPS_4.2.0_4.3.2",
+                    "K5_CPS_2.0.3_2.1.8",
                 ],
                 formatter_key="baofeng-k5",
                 # Enhanced metadata
                 form_factor=FormFactor.HANDHELD,
-                band_count=BandCount.SINGLE_BAND,  # VHF transmit only
+                band_count=BandCount.TRI_BAND,  # VHF, UHF, and 220MHz
                 max_power_watts=5.0,
                 frequency_ranges=frequency_ranges,
                 power_levels=power_levels,
@@ -212,7 +214,7 @@ class BaofengK5Formatter(BaseRadioFormatter):
             tone_up, tone_down = self.get_tone_values(row)
 
             # Generate channel name using base class helper (CallSign-Location format)
-            # K5 has very limited display (12 chars max)
+            # K5 Plus has very limited display (12 chars max)
             channel_name = self.build_channel_name(row, max_length=12, location_slice=6)
             if not channel_name:
                 channel_name = f"CH{channel:03d}"
@@ -221,10 +223,12 @@ class BaofengK5Formatter(BaseRadioFormatter):
 
             # Determine power based on frequency band
             rx_float = float(rx_freq)
-            if 136.0 <= rx_float <= 174.0:  # VHF
+            if 136.0 <= rx_float <= 174.0:  # VHF (2m)
                 tx_power = "High"  # 5W on VHF
-            elif 400.0 <= rx_float <= 520.0:  # UHF
-                tx_power = "High"  # 4W on UHF
+            elif 400.0 <= rx_float <= 520.0:  # UHF (70cm)
+                tx_power = "High"  # 5W on UHF
+            elif 200.0 <= rx_float <= 260.0:  # 220MHz (1.25m)
+                tx_power = "High"  # 5W on 220MHz
             else:
                 tx_power = "Low"
 

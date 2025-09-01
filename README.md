@@ -392,7 +392,7 @@ radiobridge/
 │       ├── anytone_878.py      # Anytone 878 formatter
 │       ├── anytone_578.py      # Anytone 578 formatter
 │       ├── baofeng_dm32uv.py   # Baofeng DM-32UV formatter
-│       └── baofeng_k5.py       # Baofeng K5 Plus formatter
+│       └── baofeng_k5_plus.py  # Baofeng K5 Plus formatter
 ├── tests/                       # Test suite
 ├── docs/                        # Documentation
 ├── pyproject.toml              # Project configuration

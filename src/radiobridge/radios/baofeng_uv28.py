@@ -6,6 +6,13 @@ import pandas as pd
 
 from .base import BaseRadioFormatter
 from .metadata import RadioMetadata
+from .enhanced_metadata import (
+    EnhancedRadioMetadata,
+    FormFactor,
+    BandCount,
+    FrequencyRange,
+    PowerLevel,
+)
 
 
 class BaofengUV28Formatter(BaseRadioFormatter):
@@ -14,8 +21,8 @@ class BaofengUV28Formatter(BaseRadioFormatter):
     This formatter converts repeater data into the CSV format expected by
     the Baofeng UV-28 programming software or CHIRP.
 
-    The UV-28 is a dual-band mobile radio that supports VHF (136-174 MHz)
-    and UHF (400-520 MHz) bands with analog FM operation and higher power output.
+    The UV-28 is a tri-band mobile radio that supports VHF (136-174 MHz),
+    UHF (400-520 MHz), and 220MHz (200-260 MHz) bands with analog FM operation and higher power output.
     """
 
     @property
@@ -26,7 +33,7 @@ class BaofengUV28Formatter(BaseRadioFormatter):
     @property
     def description(self) -> str:
         """Description of the radio and its capabilities."""
-        return "Dual-band mobile radio with VHF/UHF support and high power output"
+        return "Tri-band mobile radio with VHF/UHF/220MHz support and high power output"
 
     @property
     def manufacturer(self) -> str:
@@ -46,21 +53,73 @@ class BaofengUV28Formatter(BaseRadioFormatter):
                 manufacturer="Baofeng",
                 model="UV-28",
                 radio_version="Standard",
-                firmware_versions=[
-                    "BFB298M",
-                    "BFB297M",
-                    "BFB296M",
-                    "UV28-298",
-                    "UV28-297",
-                    "UV28-296",
-                ],
+                firmware_versions=[],  # UV-28 firmware is not upgradable
                 cps_versions=[
                     "CHIRP_next_20240301_20250401",
-                    "RT_Systems_UV28_1.0_2.5",
                     "Baofeng_UV28_CPS_1.0_1.8",
-                    "BaoFeng_Mobile_CPS_2.0_3.1",
                 ],
                 formatter_key="baofeng-uv28",
+            ),
+        ]
+
+    @property
+    def enhanced_metadata(self) -> List[EnhancedRadioMetadata]:
+        """Enhanced radio metadata with comprehensive specifications."""
+        # Frequency ranges for UV-28 (tri-band mobile radio)
+        frequency_ranges = [
+            FrequencyRange(
+                band_name="VHF",
+                min_freq_mhz=136.0,
+                max_freq_mhz=174.0,
+                step_size_khz=12.5,
+            ),  # 2m band
+            FrequencyRange(
+                band_name="220MHz",
+                min_freq_mhz=200.0,
+                max_freq_mhz=260.0,
+                step_size_khz=12.5,
+            ),  # 1.25m band
+            FrequencyRange(
+                band_name="UHF",
+                min_freq_mhz=400.0,
+                max_freq_mhz=520.0,
+                step_size_khz=12.5,
+            ),  # 70cm band
+        ]
+
+        # Power levels for tri-band 10W radio
+        power_levels = [
+            PowerLevel(name="Low", power_watts=1.0, bands=["VHF", "220MHz", "UHF"]),
+            PowerLevel(name="High", power_watts=10.0, bands=["VHF", "220MHz", "UHF"]),
+        ]
+
+        return [
+            EnhancedRadioMetadata(
+                manufacturer="Baofeng",
+                model="UV-28",
+                radio_version="Standard",
+                firmware_versions=[],  # UV-28 firmware is not upgradable
+                cps_versions=[
+                    "CHIRP_next_20240301_20250401",
+                    "Baofeng_UV28_CPS_1.0_1.8",
+                ],
+                formatter_key="baofeng-uv28",
+                # Enhanced metadata
+                form_factor=FormFactor.MOBILE,
+                band_count=BandCount.TRI_BAND,  # VHF, 220MHz, and UHF
+                max_power_watts=10.0,
+                frequency_ranges=frequency_ranges,
+                power_levels=power_levels,
+                modulation_modes=["FM"],
+                digital_modes=[],  # Analog only
+                memory_channels=200,
+                gps_enabled=False,
+                bluetooth_enabled=False,
+                display_type="LCD",
+                antenna_connector="SO-239",
+                dimensions_mm=(140, 40, 160),
+                weight_grams=800,
+                target_markets=["Amateur"],
             ),
         ]
 
@@ -229,8 +288,8 @@ class BaofengUV28Formatter(BaseRadioFormatter):
             else:
                 tstep = "5.00"
 
-            # UV-28 mobile has multiple power levels
-            power_level = "High"  # Default to High (25W VHF, 20W UHF)
+            # UV-28 has multiple power levels
+            power_level = "High"  # Default to High (10W)
 
             formatted_row = {
                 "Location": channel,

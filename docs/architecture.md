@@ -76,7 +76,7 @@ Each radio formatter inherits from `BaseRadioFormatter`:
 - `anytone_878.py`: Anytone AT-D878UV II (Plus) handheld
 - `anytone_578.py`: Anytone AT-D578UV III (Plus) mobile
 - `baofeng_dm32uv.py`: Baofeng DM-32UV handheld
-- `baofeng_k5.py`: Baofeng K5 Plus handheld
+- `baofeng_k5_plus.py`: Baofeng K5 Plus handheld
 
 ## Data Flow
 

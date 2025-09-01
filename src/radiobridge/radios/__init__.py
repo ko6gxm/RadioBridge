@@ -10,10 +10,11 @@ from typing import Dict, List, Optional, Tuple, Type
 from radiobridge.logging_config import get_logger
 from .base import BaseRadioFormatter
 from .metadata import RadioMetadata
-from .anytone_878 import Anytone878Formatter
+from .anytone_878_v3 import Anytone878V3Formatter
+from .anytone_878_v4 import Anytone878V4Formatter
 from .anytone_578 import Anytone578Formatter
 from .baofeng_dm32uv import BaofengDM32UVFormatter
-from .baofeng_k5 import BaofengK5Formatter
+from .baofeng_k5_plus import BaofengK5PlusFormatter
 from .baofeng_uv5r import BaofengUV5RFormatter
 from .baofeng_uv28 import BaofengUV28Formatter
 from .baofeng_uv25 import BaofengUV25Formatter
@@ -21,10 +22,11 @@ from .baofeng_uv5rm import BaofengUV5RMFormatter
 
 # Registry of all available radio formatters
 RADIO_FORMATTERS: Dict[str, Type[BaseRadioFormatter]] = {
-    "anytone-878": Anytone878Formatter,
+    "anytone-878-v3": Anytone878V3Formatter,
+    "anytone-878-v4": Anytone878V4Formatter,
     "anytone-578": Anytone578Formatter,
     "baofeng-dm32uv": BaofengDM32UVFormatter,
-    "baofeng-k5": BaofengK5Formatter,
+    "baofeng-k5": BaofengK5PlusFormatter,
     "baofeng-uv5r": BaofengUV5RFormatter,
     "baofeng-uv28": BaofengUV28Formatter,
     "baofeng-uv25": BaofengUV25Formatter,
@@ -33,9 +35,15 @@ RADIO_FORMATTERS: Dict[str, Type[BaseRadioFormatter]] = {
 
 # Aliases for common radio names
 RADIO_ALIASES: Dict[str, str] = {
-    "anytone878": "anytone-878",
-    "anytone_878": "anytone-878",
-    "878": "anytone-878",
+    "anytone878": "anytone-878-v3",  # Default to v3 for backward compatibility
+    "anytone_878": "anytone-878-v3",
+    "878": "anytone-878-v3",
+    "anytone878v3": "anytone-878-v3",
+    "anytone-878v3": "anytone-878-v3",
+    "878v3": "anytone-878-v3",
+    "anytone878v4": "anytone-878-v4",
+    "anytone-878v4": "anytone-878-v4",
+    "878v4": "anytone-878-v4",
     "anytone578": "anytone-578",
     "anytone_578": "anytone-578",
     "578": "anytone-578",

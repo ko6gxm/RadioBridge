@@ -53,20 +53,10 @@ class BaofengUV5RFormatter(BaseRadioFormatter):
                 manufacturer="Baofeng",
                 model="UV-5R",
                 radio_version="Standard",
-                firmware_versions=[
-                    "BFB298",
-                    "BFB297",
-                    "BFB296",
-                    "BFB295",
-                    "N5R-298",
-                    "N5R-297",
-                    "N5R-296",
-                ],
+                firmware_versions=[],  # UV-5R firmware is not upgradable
                 cps_versions=[
                     "CHIRP_next_20240301_20250401",
-                    "RT_Systems_UV5R_4.0_5.2",
                     "Baofeng_UV5R_CPS_1.0_2.1",
-                    "BaoFeng_CPS_5.0_6.1",
                 ],
                 formatter_key="baofeng-uv5r",
             ),
@@ -93,20 +83,10 @@ class BaofengUV5RFormatter(BaseRadioFormatter):
                 manufacturer="Baofeng",
                 model="UV-5R",
                 radio_version="Standard",
-                firmware_versions=[
-                    "BFB298",
-                    "BFB297",
-                    "BFB296",
-                    "BFB295",
-                    "N5R-298",
-                    "N5R-297",
-                    "N5R-296",
-                ],
+                firmware_versions=[],  # UV-5R firmware is not upgradable
                 cps_versions=[
                     "CHIRP_next_20240301_20250401",
-                    "RT_Systems_UV5R_4.0_5.2",
                     "Baofeng_UV5R_CPS_1.0_2.1",
-                    "BaoFeng_CPS_5.0_6.1",
                 ],
                 formatter_key="baofeng-uv5r",
                 # Enhanced metadata

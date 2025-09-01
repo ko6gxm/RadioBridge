@@ -308,10 +308,10 @@ class TestToneUpDownFunctionality:
         assert result.iloc[0]["CTCSS/DCS Decode"] == "456.0"
 
     def test_baofeng_k5_supports_separate_tones(self):
-        """Test Baofeng K5 formatter with separate tone_up and tone_down."""
-        from radiobridge.radios.baofeng_k5 import BaofengK5Formatter
+        """Test Baofeng K5 Plus formatter with separate tone_up and tone_down."""
+        from radiobridge.radios.baofeng_k5_plus import BaofengK5PlusFormatter
 
-        formatter = BaofengK5Formatter()
+        formatter = BaofengK5PlusFormatter()
 
         test_data = pd.DataFrame(
             {

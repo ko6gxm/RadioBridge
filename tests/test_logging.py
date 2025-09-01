@@ -437,11 +437,11 @@ class TestFormatterLogging:
             assert len(result) == 3
 
     def test_baofeng_k5_formatter_logging(self, caplog):
-        """Test logging in Baofeng K5 formatter."""
-        from radiobridge.radios.baofeng_k5 import BaofengK5Formatter
+        """Test logging in Baofeng K5 Plus formatter."""
+        from radiobridge.radios.baofeng_k5_plus import BaofengK5PlusFormatter
 
         with caplog.at_level(logging.DEBUG):
-            formatter = BaofengK5Formatter()
+            formatter = BaofengK5PlusFormatter()
 
             # Should log initialization
             init_logs = [
@@ -571,11 +571,11 @@ class TestFormatterLogging:
 
     def test_formatter_input_validation_logging(self, caplog):
         """Test that formatters log input validation details."""
-        from radiobridge.radios.baofeng_k5 import BaofengK5Formatter
+        from radiobridge.radios.baofeng_k5_plus import BaofengK5PlusFormatter
         import pandas as pd
 
         with caplog.at_level(logging.DEBUG):
-            formatter = BaofengK5Formatter()
+            formatter = BaofengK5PlusFormatter()
 
             # Test with missing required column
             invalid_data = pd.DataFrame(
