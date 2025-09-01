@@ -5,10 +5,11 @@ Each formatter converts generic repeater data into the specific format
 required by that radio's programming software.
 """
 
-from typing import Dict, List, Optional, Type
+from typing import Dict, List, Optional, Tuple, Type
 
 from radiobridge.logging_config import get_logger
 from .base import BaseRadioFormatter
+from .metadata import RadioMetadata
 from .anytone_878 import Anytone878Formatter
 from .anytone_578 import Anytone578Formatter
 from .baofeng_dm32uv import BaofengDM32UVFormatter
@@ -87,6 +88,44 @@ def get_radio_formatter(radio_name: str) -> Optional[BaseRadioFormatter]:
     return None
 
 
+def list_radio_options() -> List[Tuple[int, RadioMetadata]]:
+    """Get numbered list of all radio options with detailed metadata.
+
+    Flattens metadata from all registered formatters into a single numbered list.
+
+    Returns:
+        List of tuples (index, RadioMetadata) where index starts at 1
+    """
+    options = []
+    index = 1
+
+    for formatter_class in RADIO_FORMATTERS.values():
+        formatter = formatter_class()
+        for metadata in formatter.metadata:
+            options.append((index, metadata))
+            index += 1
+
+    return options
+
+
+def resolve_by_index(idx: int) -> Optional[BaseRadioFormatter]:
+    """Resolve radio formatter by numbered index from list_radio_options.
+
+    Args:
+        idx: 1-based index from list_radio_options
+
+    Returns:
+        Formatter instance if found, None if index out of range
+    """
+    options = list_radio_options()
+
+    if 1 <= idx <= len(options):
+        _, metadata = options[idx - 1]  # Convert to 0-based
+        return get_radio_formatter(metadata.formatter_key)
+
+    return None
+
+
 def list_radio_info() -> Dict[str, Dict[str, str]]:
     """Get detailed information about all supported radios.
 
@@ -109,9 +148,12 @@ def list_radio_info() -> Dict[str, Dict[str, str]]:
 
 __all__ = [
     "BaseRadioFormatter",
+    "RadioMetadata",
     "get_supported_radios",
     "get_radio_formatter",
     "list_radio_info",
+    "list_radio_options",
+    "resolve_by_index",
     "RADIO_FORMATTERS",
     "RADIO_ALIASES",
 ]

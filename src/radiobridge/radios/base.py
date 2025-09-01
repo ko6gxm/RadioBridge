@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import pandas as pd
 
 from radiobridge.logging_config import get_logger
+from .metadata import RadioMetadata
 
 
 class BaseRadioFormatter(ABC):
@@ -48,6 +49,18 @@ class BaseRadioFormatter(ABC):
     @abstractmethod
     def output_columns(self) -> List[str]:
         """List of column names in the formatted output."""
+        pass
+
+    @property
+    @abstractmethod
+    def metadata(self) -> List[RadioMetadata]:
+        """Radio metadata across five dimensions.
+
+        Returns:
+            List of RadioMetadata objects representing all supported combinations
+            of manufacturer, model, radio_version, firmware_versions, and cps_versions
+            for this formatter.
+        """
         pass
 
     @abstractmethod

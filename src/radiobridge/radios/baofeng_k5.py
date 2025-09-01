@@ -5,6 +5,7 @@ from typing import List
 import pandas as pd
 
 from .base import BaseRadioFormatter
+from .metadata import RadioMetadata
 
 
 class BaofengK5Formatter(BaseRadioFormatter):
@@ -33,6 +34,28 @@ class BaofengK5Formatter(BaseRadioFormatter):
     def model(self) -> str:
         """Radio model."""
         return "K5 Plus"
+
+    @property
+    def metadata(self) -> List[RadioMetadata]:
+        """Radio metadata across five dimensions."""
+        return [
+            RadioMetadata(
+                manufacturer="Baofeng",
+                model="K5 Plus",
+                radio_version="v2.1",
+                firmware_versions=["2.1.8", "2.1.7"],
+                cps_versions=["K5-CPS 2.1.8", "CHIRP 20241201"],
+                formatter_key="baofeng-k5",
+            ),
+            RadioMetadata(
+                manufacturer="Baofeng",
+                model="K5 Plus",
+                radio_version="v2.0",
+                firmware_versions=["2.0.5", "2.0.4"],
+                cps_versions=["K5-CPS 2.0.5", "CHIRP 20240901"],
+                formatter_key="baofeng-k5",
+            ),
+        ]
 
     @property
     def required_columns(self) -> List[str]:

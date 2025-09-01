@@ -25,7 +25,12 @@ from radiobridge.detailed_downloader import (
     download_with_details_by_city,
 )
 from radiobridge.logging_config import setup_logging, get_logger
-from radiobridge.radios import get_supported_radios, get_radio_formatter
+from radiobridge.radios import (
+    get_supported_radios,
+    get_radio_formatter,
+    list_radio_options,
+    resolve_by_index,
+)
 
 
 @click.group()
@@ -356,14 +361,29 @@ def format(
         data = read_csv(input_file, comment="#")
 
         # Get the formatter for the specified radio
-        formatter = get_radio_formatter(radio)
-        if formatter is None:
-            supported = ", ".join(get_supported_radios())
-            click.echo(
-                f"Error: Unsupported radio '{radio}'. Supported radios: {supported}",
-                err=True,
-            )
-            sys.exit(1)
+        # Try to resolve by index first if it's a number, otherwise by name
+        formatter = None
+        if radio.isdigit():
+            radio_index = int(radio)
+            formatter = resolve_by_index(radio_index)
+            if formatter is None:
+                max_options = len(list_radio_options())
+                click.echo(
+                    f"Error: Radio index '{radio_index}' is out of range "
+                    f"(1-{max_options}). Use 'rb list-radios' to see valid options.",
+                    err=True,
+                )
+                sys.exit(1)
+        else:
+            formatter = get_radio_formatter(radio)
+            if formatter is None:
+                supported = ", ".join(get_supported_radios())
+                click.echo(
+                    f"Error: Unsupported radio '{radio}'. Supported radios: {supported}. "
+                    "Use 'rb list-radios' to see all options including numbers.",
+                    err=True,
+                )
+                sys.exit(1)
 
         # Format the data with start channel
         formatted_data = formatter.format(data, start_channel=start_channel)
@@ -442,16 +462,24 @@ def format(
 
 @main.command("list-radios")
 def list_radios() -> None:
-    """List all supported radio models."""
-    radios = get_supported_radios()
+    """List all supported radio models with numbered options."""
+    options = list_radio_options()
 
-    if not radios:
+    if not options:
         click.echo("No supported radios found.")
         return
 
     click.echo("RadioBridge - Supported radio models:")
-    for radio in sorted(radios):
-        click.echo(f"  • {radio}")
+    click.echo("")
+
+    for index, metadata in options:
+        click.echo(f"{index:2d}) {metadata}")
+
+    click.echo("")
+    click.echo("Usage:")
+    click.echo("  • Use numbers: rb format input.csv --radio 1")
+    click.echo("  • Use names:   rb format input.csv --radio anytone-878")
+    click.echo("")
 
 
 if __name__ == "__main__":
