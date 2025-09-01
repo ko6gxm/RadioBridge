@@ -6,6 +6,13 @@ import pandas as pd
 
 from .base import BaseRadioFormatter
 from .metadata import RadioMetadata
+from .enhanced_metadata import (
+    EnhancedRadioMetadata,
+    FormFactor,
+    BandCount,
+    FrequencyRange,
+    PowerLevel,
+)
 
 
 class BaofengK5Formatter(BaseRadioFormatter):
@@ -23,7 +30,7 @@ class BaofengK5Formatter(BaseRadioFormatter):
     @property
     def description(self) -> str:
         """Description of the radio and its capabilities."""
-        return "Compact dual-band analog handheld radio"
+        return "Compact single-band VHF analog handheld radio"
 
     @property
     def manufacturer(self) -> str:
@@ -58,6 +65,60 @@ class BaofengK5Formatter(BaseRadioFormatter):
                     "OpenGD77_CPS_4.2.0_4.3.2",
                 ],
                 formatter_key="baofeng-k5",
+            ),
+        ]
+
+    @property
+    def enhanced_metadata(self) -> List[EnhancedRadioMetadata]:
+        """Enhanced radio metadata with comprehensive specifications."""
+        # Frequency ranges for K5 (VHF only for TX, VHF+UHF for RX)
+        frequency_ranges = [
+            FrequencyRange("VHF", 136.0, 174.0, 12.5),
+            FrequencyRange("UHF", 400.0, 520.0, 12.5, rx_only=True),  # RX only
+        ]
+
+        # Power levels for single-band handheld radio
+        power_levels = [
+            PowerLevel("Low", 1.0, ["VHF"]),
+            PowerLevel("High", 5.0, ["VHF"]),
+        ]
+
+        return [
+            EnhancedRadioMetadata(
+                manufacturer="Baofeng",
+                model="K5",
+                radio_version="Standard",
+                firmware_versions=[
+                    "v2.0.1.26",
+                    "v2.0.1.23",
+                    "v2.0.0.22",
+                    "v1.9.0.26",
+                    "v1.8.3.26",
+                    "v1.8.2.26",
+                ],
+                cps_versions=[
+                    "K5_CPS_2.0.3_2.1.8",
+                    "CHIRP_next_20240301_20250401",
+                    "Baofeng_CPS_K5_1.2_2.0",
+                    "OpenGD77_CPS_4.2.0_4.3.2",
+                ],
+                formatter_key="baofeng-k5",
+                # Enhanced metadata
+                form_factor=FormFactor.HANDHELD,
+                band_count=BandCount.SINGLE_BAND,  # VHF transmit only
+                max_power_watts=5.0,
+                frequency_ranges=frequency_ranges,
+                power_levels=power_levels,
+                modulation_modes=["FM"],
+                digital_modes=[],  # Analog only
+                memory_channels=999,
+                gps_enabled=False,
+                bluetooth_enabled=False,
+                display_type="LCD",
+                antenna_connector="SMA-Female",
+                dimensions_mm=(58, 105, 30),
+                weight_grams=200,
+                target_markets=["Amateur"],
             ),
         ]
 

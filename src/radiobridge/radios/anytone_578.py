@@ -6,6 +6,13 @@ import pandas as pd
 
 from .base import BaseRadioFormatter
 from .metadata import RadioMetadata
+from .enhanced_metadata import (
+    EnhancedRadioMetadata,
+    FormFactor,
+    BandCount,
+    FrequencyRange,
+    PowerLevel,
+)
 
 
 class Anytone578Formatter(BaseRadioFormatter):
@@ -62,6 +69,75 @@ class Anytone578Formatter(BaseRadioFormatter):
                     "CHIRP_next_20240301_20240801",
                 ],
                 formatter_key="anytone-578",
+            ),
+        ]
+
+    @property
+    def enhanced_metadata(self) -> List[EnhancedRadioMetadata]:
+        """Enhanced radio metadata with comprehensive specifications."""
+        # Common frequency ranges for both variants
+        frequency_ranges = [
+            FrequencyRange("VHF", 136.0, 174.0, 12.5),
+            FrequencyRange("UHF", 400.0, 520.0, 12.5),
+        ]
+
+        # Power levels for mobile radio
+        power_levels = [
+            PowerLevel("Low", 5.0, ["VHF", "UHF"]),
+            PowerLevel("Medium", 25.0, ["VHF", "UHF"]),
+            PowerLevel("High", 50.0, ["VHF", "UHF"]),
+        ]
+
+        return [
+            EnhancedRadioMetadata(
+                manufacturer="Anytone",
+                model="AT-D578UV III Plus",
+                radio_version="Plus",
+                firmware_versions=["1.30", "1.29", "1.28"],
+                cps_versions=[
+                    "Anytone_CPS_2.10_2.18",
+                    "Anytone_CPS_3.00_3.05",
+                    "CHIRP_next_20240801_20250401",
+                ],
+                formatter_key="anytone-578",
+                # Enhanced metadata
+                form_factor=FormFactor.MOBILE,
+                band_count=BandCount.DUAL_BAND,
+                max_power_watts=50.0,
+                frequency_ranges=frequency_ranges,
+                power_levels=power_levels,
+                modulation_modes=["FM", "DMR"],
+                digital_modes=["DMR"],
+                memory_channels=4000,
+                gps_enabled=True,
+                display_type="TFT Color LCD",
+                antenna_connector="SO-239",
+                target_markets=["Amateur", "Commercial"],
+            ),
+            EnhancedRadioMetadata(
+                manufacturer="Anytone",
+                model="AT-D578UV III",
+                radio_version="Standard",
+                firmware_versions=["1.25", "1.24"],
+                cps_versions=[
+                    "Anytone_CPS_2.00_2.08",
+                    "Anytone_CPS_2.10_2.15",
+                    "CHIRP_next_20240301_20240801",
+                ],
+                formatter_key="anytone-578",
+                # Enhanced metadata
+                form_factor=FormFactor.MOBILE,
+                band_count=BandCount.DUAL_BAND,
+                max_power_watts=50.0,
+                frequency_ranges=frequency_ranges,
+                power_levels=power_levels,
+                modulation_modes=["FM", "DMR"],
+                digital_modes=["DMR"],
+                memory_channels=4000,
+                gps_enabled=True,
+                display_type="TFT Color LCD",
+                antenna_connector="SO-239",
+                target_markets=["Amateur", "Commercial"],
             ),
         ]
 
@@ -133,7 +209,8 @@ class Anytone578Formatter(BaseRadioFormatter):
                 self.logger.debug(f"Skipping row {idx}: no valid frequency found")
                 continue
 
-            # Get TX frequency - try detailed downloader first, then calculate from offset
+            # Get TX frequency - try detailed downloader first,
+            # then calculate from offset
             tx_freq_raw = self.get_tx_frequency(row)
             if tx_freq_raw:
                 tx_freq = self.clean_frequency(tx_freq_raw)

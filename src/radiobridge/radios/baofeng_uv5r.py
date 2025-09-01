@@ -6,6 +6,13 @@ import pandas as pd
 
 from .base import BaseRadioFormatter
 from .metadata import RadioMetadata
+from .enhanced_metadata import (
+    EnhancedRadioMetadata,
+    FormFactor,
+    BandCount,
+    FrequencyRange,
+    PowerLevel,
+)
 
 
 class BaofengUV5RFormatter(BaseRadioFormatter):
@@ -62,6 +69,62 @@ class BaofengUV5RFormatter(BaseRadioFormatter):
                     "BaoFeng_CPS_5.0_6.1",
                 ],
                 formatter_key="baofeng-uv5r",
+            ),
+        ]
+
+    @property
+    def enhanced_metadata(self) -> List[EnhancedRadioMetadata]:
+        """Enhanced radio metadata with comprehensive specifications."""
+        # Frequency ranges for UV-5R
+        frequency_ranges = [
+            FrequencyRange("VHF", 136.0, 174.0, 12.5),
+            FrequencyRange("UHF", 400.0, 520.0, 12.5),
+        ]
+
+        # Power levels for handheld radio
+        power_levels = [
+            PowerLevel("Low", 1.0, ["VHF", "UHF"]),
+            PowerLevel("High", 8.0, ["VHF"]),
+            PowerLevel("High", 7.0, ["UHF"]),  # Slightly lower on UHF
+        ]
+
+        return [
+            EnhancedRadioMetadata(
+                manufacturer="Baofeng",
+                model="UV-5R",
+                radio_version="Standard",
+                firmware_versions=[
+                    "BFB298",
+                    "BFB297",
+                    "BFB296",
+                    "BFB295",
+                    "N5R-298",
+                    "N5R-297",
+                    "N5R-296",
+                ],
+                cps_versions=[
+                    "CHIRP_next_20240301_20250401",
+                    "RT_Systems_UV5R_4.0_5.2",
+                    "Baofeng_UV5R_CPS_1.0_2.1",
+                    "BaoFeng_CPS_5.0_6.1",
+                ],
+                formatter_key="baofeng-uv5r",
+                # Enhanced metadata
+                form_factor=FormFactor.HANDHELD,
+                band_count=BandCount.DUAL_BAND,
+                max_power_watts=8.0,
+                frequency_ranges=frequency_ranges,
+                power_levels=power_levels,
+                modulation_modes=["FM"],
+                digital_modes=[],  # Analog only
+                memory_channels=128,
+                gps_enabled=False,
+                bluetooth_enabled=False,
+                display_type="LCD",
+                antenna_connector="SMA-Female",
+                dimensions_mm=(58, 110, 32),
+                weight_grams=250,
+                target_markets=["Amateur"],
             ),
         ]
 

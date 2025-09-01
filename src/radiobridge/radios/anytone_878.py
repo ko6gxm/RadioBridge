@@ -6,6 +6,13 @@ import pandas as pd
 
 from .base import BaseRadioFormatter
 from .metadata import RadioMetadata
+from .enhanced_metadata import (
+    EnhancedRadioMetadata,
+    FormFactor,
+    BandCount,
+    FrequencyRange,
+    PowerLevel,
+)
 
 
 class Anytone878Formatter(BaseRadioFormatter):
@@ -62,6 +69,81 @@ class Anytone878Formatter(BaseRadioFormatter):
                     "CHIRP_next_20240301_20240801",
                 ],
                 formatter_key="anytone-878",
+            ),
+        ]
+
+    @property
+    def enhanced_metadata(self) -> List[EnhancedRadioMetadata]:
+        """Enhanced radio metadata with comprehensive specifications."""
+        # Common frequency ranges for both variants
+        frequency_ranges = [
+            FrequencyRange("VHF", 136.0, 174.0, 12.5),
+            FrequencyRange("UHF", 400.0, 520.0, 12.5),
+        ]
+
+        # Power levels for handheld radio
+        power_levels = [
+            PowerLevel("Low", 1.0, ["VHF", "UHF"]),
+            PowerLevel("High", 7.0, ["VHF"]),
+            PowerLevel("High", 6.0, ["UHF"]),  # Slightly lower on UHF
+        ]
+
+        return [
+            EnhancedRadioMetadata(
+                manufacturer="Anytone",
+                model="AT-D878UV II Plus",
+                radio_version="Plus",
+                firmware_versions=["1.24", "1.23", "1.22"],
+                cps_versions=[
+                    "Anytone_CPS_3.00_3.08",
+                    "Anytone_CPS_4.00",
+                    "CHIRP_next_20240801_20250401",
+                ],
+                formatter_key="anytone-878",
+                # Enhanced metadata
+                form_factor=FormFactor.HANDHELD,
+                band_count=BandCount.DUAL_BAND,
+                max_power_watts=7.0,
+                frequency_ranges=frequency_ranges,
+                power_levels=power_levels,
+                modulation_modes=["FM", "DMR"],
+                digital_modes=["DMR"],
+                memory_channels=4000,
+                gps_enabled=True,
+                bluetooth_enabled=True,
+                display_type="TFT Color LCD",
+                antenna_connector="SMA-Female",
+                dimensions_mm=(58, 96, 32),
+                weight_grams=270,
+                target_markets=["Amateur", "Commercial"],
+            ),
+            EnhancedRadioMetadata(
+                manufacturer="Anytone",
+                model="AT-D878UV II",
+                radio_version="Standard",
+                firmware_versions=["1.20", "1.19"],
+                cps_versions=[
+                    "Anytone_CPS_2.50_2.58",
+                    "Anytone_CPS_3.00_3.05",
+                    "CHIRP_next_20240301_20240801",
+                ],
+                formatter_key="anytone-878",
+                # Enhanced metadata
+                form_factor=FormFactor.HANDHELD,
+                band_count=BandCount.DUAL_BAND,
+                max_power_watts=7.0,
+                frequency_ranges=frequency_ranges,
+                power_levels=power_levels,
+                modulation_modes=["FM", "DMR"],
+                digital_modes=["DMR"],
+                memory_channels=4000,
+                gps_enabled=True,
+                bluetooth_enabled=False,  # Standard version lacks Bluetooth
+                display_type="TFT Color LCD",
+                antenna_connector="SMA-Female",
+                dimensions_mm=(58, 96, 32),
+                weight_grams=270,
+                target_markets=["Amateur", "Commercial"],
             ),
         ]
 
