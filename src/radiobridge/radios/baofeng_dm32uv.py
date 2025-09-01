@@ -42,17 +42,13 @@ class BaofengDM32UVFormatter(BaseRadioFormatter):
             RadioMetadata(
                 manufacturer="Baofeng",
                 model="DM-32UV",
-                radio_version="v2",
-                firmware_versions=["2.14", "2.13", "2.12"],
-                cps_versions=["DM-32UV CPS 2.14", "CHIRP-next 20240801-20250401"],
-                formatter_key="baofeng-dm32uv",
-            ),
-            RadioMetadata(
-                manufacturer="Baofeng",
-                model="DM-32UV",
-                radio_version="v1",
-                firmware_versions=["2.10", "2.09", "2.08"],
-                cps_versions=["DM-32UV CPS 2.10", "CHIRP-next 20240301-20240801"],
+                radio_version="Standard",
+                firmware_versions=["2.14", "2.13", "2.12", "2.10", "2.09", "2.08"],
+                cps_versions=[
+                    "DM_32UV_CPS_2.08_2.14",
+                    "CHIRP_next_20240301_20250401",
+                    "OpenGD77_CPS_4.2.0_4.3.0",
+                ],
                 formatter_key="baofeng-dm32uv",
             ),
         ]
@@ -110,7 +106,12 @@ class BaofengDM32UVFormatter(BaseRadioFormatter):
             "PTT ID Display",
         ]
 
-    def format(self, data: pd.DataFrame, start_channel: int = 1) -> pd.DataFrame:
+    def format(
+        self,
+        data: pd.DataFrame,
+        start_channel: int = 1,
+        cps_version: Optional[str] = None,
+    ) -> pd.DataFrame:
         """Format repeater data for Baofeng DM-32UV.
 
         Args:
@@ -123,7 +124,14 @@ class BaofengDM32UVFormatter(BaseRadioFormatter):
         self.validate_input(data)
 
         self.logger.info(f"Starting format operation for {len(data)} repeaters")
+        if cps_version:
+            self.logger.info(f"Optimizing output for CPS version: {cps_version}")
         self.logger.debug(f"Input columns: {list(data.columns)}")
+
+        # CPS-specific optimizations
+        use_chirp_format = cps_version and "chirp" in cps_version.lower()
+        if use_chirp_format:
+            self.logger.debug("Using CHIRP-optimized formatting")
 
         formatted_data = []
         channel_names = []  # Collect names for conflict resolution

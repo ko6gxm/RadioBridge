@@ -1,6 +1,6 @@
 """Formatter for Anytone AT-D578UV III (Plus) mobile radio."""
 
-from typing import List
+from typing import List, Optional
 
 import pandas as pd
 
@@ -44,7 +44,11 @@ class Anytone578Formatter(BaseRadioFormatter):
                 model="AT-D578UV III Plus",
                 radio_version="Plus",
                 firmware_versions=["1.30", "1.29", "1.28"],
-                cps_versions=["1.30", "1.29"],
+                cps_versions=[
+                    "Anytone_CPS_2.10_2.18",
+                    "Anytone_CPS_3.00_3.05",
+                    "CHIRP_next_20240801_20250401",
+                ],
                 formatter_key="anytone-578",
             ),
             RadioMetadata(
@@ -52,7 +56,11 @@ class Anytone578Formatter(BaseRadioFormatter):
                 model="AT-D578UV III",
                 radio_version="Standard",
                 firmware_versions=["1.25", "1.24"],
-                cps_versions=["1.25", "1.24"],
+                cps_versions=[
+                    "Anytone_CPS_2.00_2.08",
+                    "Anytone_CPS_2.10_2.15",
+                    "CHIRP_next_20240301_20240801",
+                ],
                 formatter_key="anytone-578",
             ),
         ]
@@ -93,7 +101,12 @@ class Anytone578Formatter(BaseRadioFormatter):
             "Roaming",
         ]
 
-    def format(self, data: pd.DataFrame, start_channel: int = 1) -> pd.DataFrame:
+    def format(
+        self,
+        data: pd.DataFrame,
+        start_channel: int = 1,
+        cps_version: Optional[str] = None,
+    ) -> pd.DataFrame:
         """Format repeater data for Anytone 578.
 
         Args:

@@ -64,12 +64,18 @@ class BaseRadioFormatter(ABC):
         pass
 
     @abstractmethod
-    def format(self, data: pd.DataFrame, start_channel: int = 1) -> pd.DataFrame:
+    def format(
+        self,
+        data: pd.DataFrame,
+        start_channel: int = 1,
+        cps_version: Optional[str] = None,
+    ) -> pd.DataFrame:
         """Format repeater data for this radio.
 
         Args:
             data: Input DataFrame with repeater information
             start_channel: Starting channel number (default: 1)
+            cps_version: CPS version to optimize output for (optional)
 
         Returns:
             Formatted DataFrame ready for radio programming software
@@ -571,3 +577,219 @@ class BaseRadioFormatter(ABC):
 
         else:
             return "Mixed"[:max_length]
+
+    def validate_cps_version(self, cps_version: str) -> bool:
+        """Validate that the specified CPS version is supported by this radio.
+
+        Args:
+            cps_version: CPS version string to validate
+
+        Returns:
+            True if the CPS version is supported, False otherwise
+        """
+        if not cps_version:
+            return True  # None/empty is always valid (use default behavior)
+
+        # Get all supported CPS versions from metadata
+        supported_versions = set()
+        for metadata in self.metadata:
+            supported_versions.update(metadata.cps_versions)
+
+        # Normalize user input: convert spaces to underscores for comparison
+        normalized_user = cps_version.replace(" ", "_")
+
+        # Check for exact match first (after normalization)
+        if normalized_user in supported_versions:
+            return True
+
+        # Check for version range matches
+        for supported in supported_versions:
+            if self._version_matches_range(normalized_user, supported):
+                return True
+
+        # Check for partial matches (e.g., "CHIRP next" matching CHIRP ranges)
+        cps_lower = cps_version.lower()
+        for supported in supported_versions:
+            supported_lower = supported.lower()
+
+            # Handle CHIRP-style matching (user says "CHIRP next DATE" matches "CHIRP_next_DATE1_DATE2")
+            if "chirp" in cps_lower and "chirp" in supported_lower:
+                # Extract date from user input if present
+                user_words = cps_lower.split()
+                if (
+                    len(user_words) >= 3
+                    and user_words[0] == "chirp"
+                    and user_words[1] == "next"
+                ):
+                    user_date_part = user_words[2]
+
+                    # Handle dash-separated date ranges like "20240901-20250401"
+                    if "-" in user_date_part:
+                        # For exact range matches, normalize to underscore format
+                        date_range = user_date_part.replace("-", "_")
+                        expected_format = f"chirp_next_{date_range}"
+                        if expected_format in supported_lower:
+                            return True
+                    else:
+                        # Single date - check if it falls within any range
+                        if self._date_in_chirp_range(user_date_part, supported):
+                            return True
+                # Also match if user just says "CHIRP next" without specific date
+                elif (
+                    len(user_words) == 2
+                    and user_words[0] == "chirp"
+                    and user_words[1] == "next"
+                ):
+                    if "chirp_next" in supported_lower:
+                        return True
+
+        return False
+
+    def _version_matches_range(self, user_version: str, supported_range: str) -> bool:
+        """Check if a user-specified version falls within a supported range.
+
+        Args:
+            user_version: Version string from user (e.g., "Anytone_CPS_3.05")
+            supported_range: Range string from metadata (e.g., "Anytone_CPS_3.00_3.08")
+
+        Returns:
+            True if the user version is within the supported range
+        """
+        try:
+            # Handle CPS version ranges like "Anytone_CPS_3.00_3.08"
+            if "_CPS_" in supported_range and "_CPS_" in user_version:
+                range_parts = supported_range.split("_")
+                user_parts = user_version.split("_")
+
+                # Find CPS position in both range and user parts
+                range_cps_idx = -1
+                user_cps_idx = -1
+
+                for i, part in enumerate(range_parts):
+                    if part == "CPS":
+                        range_cps_idx = i
+                        break
+
+                for i, part in enumerate(user_parts):
+                    if part == "CPS":
+                        user_cps_idx = i
+                        break
+
+                # Check if we found CPS in both and have enough parts for a range
+                if (
+                    range_cps_idx >= 1
+                    and user_cps_idx >= 1
+                    and len(range_parts) >= range_cps_idx + 3  # CPS + start + end
+                    and len(user_parts) >= user_cps_idx + 2
+                ):  # CPS + version
+
+                    # Check if base names match (everything before and including CPS)
+                    range_base = "_".join(
+                        range_parts[: range_cps_idx + 1]
+                    )  # e.g., "DM_32UV_CPS"
+                    user_base = "_".join(
+                        user_parts[: user_cps_idx + 1]
+                    )  # e.g., "DM_32UV_CPS"
+
+                    if range_base == user_base:
+                        # Extract version components
+                        user_ver = user_parts[user_cps_idx + 1]  # e.g., "2.10"
+                        range_start = range_parts[range_cps_idx + 1]  # e.g., "2.08"
+                        range_end = range_parts[range_cps_idx + 2]  # e.g., "2.12"
+
+                        # Version comparison - handle both simple and complex versions
+                        try:
+                            # Try simple float comparison first
+                            user_float = float(user_ver)
+                            start_float = float(range_start)
+                            end_float = float(range_end)
+                            return start_float <= user_float <= end_float
+                        except ValueError:
+                            # Handle complex version numbers like "2.0.6" or "1.2.3.4"
+                            try:
+                                return self._compare_version_strings(
+                                    user_ver, range_start, range_end
+                                )
+                            except Exception:
+                                pass
+
+            return False
+        except (IndexError, ValueError):
+            return False
+
+    def _date_in_chirp_range(self, user_date: str, supported_range: str) -> bool:
+        """Check if a user date falls within a CHIRP date range.
+
+        Args:
+            user_date: Date string from user (e.g., "20241201")
+            supported_range: CHIRP range string (e.g., "CHIRP_next_20240801_20250401")
+
+        Returns:
+            True if the user date is within the supported range
+        """
+        try:
+            # Extract start and end dates from supported range
+            if "chirp_next" in supported_range.lower():
+                parts = supported_range.split("_")
+                if len(parts) >= 4:  # ["CHIRP", "next", start_date, end_date]
+                    start_date = parts[2]
+                    end_date = parts[3]
+
+                    # Simple string comparison for YYYYMMDD dates
+                    if (
+                        len(user_date) == 8
+                        and len(start_date) == 8
+                        and len(end_date) == 8
+                    ):
+                        return start_date <= user_date <= end_date
+
+            return False
+        except (IndexError, ValueError):
+            return False
+
+    def _compare_version_strings(
+        self, user_ver: str, range_start: str, range_end: str
+    ) -> bool:
+        """Compare complex version strings like '2.0.6' with range '2.0.6' to '2.1.8'.
+
+        Args:
+            user_ver: User version string (e.g., "2.0.6")
+            range_start: Start of range (e.g., "2.0.6")
+            range_end: End of range (e.g., "2.1.8")
+
+        Returns:
+            True if user_ver falls within the range
+        """
+        try:
+
+            def parse_version(version_str: str) -> List[int]:
+                """Parse version string into list of integers."""
+                return [int(x) for x in version_str.split(".")]
+
+            user_parts = parse_version(user_ver)
+            start_parts = parse_version(range_start)
+            end_parts = parse_version(range_end)
+
+            # Pad shorter versions with zeros for comparison
+            max_len = max(len(user_parts), len(start_parts), len(end_parts))
+
+            user_parts += [0] * (max_len - len(user_parts))
+            start_parts += [0] * (max_len - len(start_parts))
+            end_parts += [0] * (max_len - len(end_parts))
+
+            # Compare as tuples
+            return tuple(start_parts) <= tuple(user_parts) <= tuple(end_parts)
+        except (ValueError, TypeError):
+            # Fallback to string comparison if numeric parsing fails
+            return range_start <= user_ver <= range_end
+
+    def get_supported_cps_versions(self) -> List[str]:
+        """Get all supported CPS versions for this radio.
+
+        Returns:
+            List of supported CPS version strings
+        """
+        supported_versions = set()
+        for metadata in self.metadata:
+            supported_versions.update(metadata.cps_versions)
+        return sorted(list(supported_versions))

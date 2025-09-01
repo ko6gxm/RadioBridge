@@ -336,6 +336,10 @@ def download(
     default=64,
     help="Maximum channels per zone (default: 64)",
 )
+@click.option(
+    "--cps",
+    help="Specify the CPS (Customer Programming Software) version to optimize output for",
+)
 @click.pass_context
 def format(
     ctx: click.Context,
@@ -347,6 +351,7 @@ def format(
     zone_strategy: str,
     max_zones: int,
     max_channels_per_zone: int,
+    cps: Optional[str],
 ) -> None:
     """Format repeater data for a specific radio model."""
     logger = get_logger(__name__)
@@ -386,8 +391,22 @@ def format(
                 )
                 sys.exit(1)
 
-        # Format the data with start channel
-        formatted_data = formatter.format(data, start_channel=start_channel)
+        # Validate CPS version if specified
+        if cps:
+            if not formatter.validate_cps_version(cps):
+                supported_versions = formatter.get_supported_cps_versions()
+                click.echo(
+                    f"Error: CPS version '{cps}' is not supported by {formatter.radio_name}. "
+                    f"Supported CPS versions: {', '.join(supported_versions)}",
+                    err=True,
+                )
+                sys.exit(1)
+            logger.info(f"Using CPS version: {cps}")
+
+        # Format the data with start channel and CPS version
+        formatted_data = formatter.format(
+            data, start_channel=start_channel, cps_version=cps
+        )
 
         if start_channel != 1:
             logger.info(f"Using custom start channel: {start_channel}")
@@ -471,11 +490,15 @@ def list_radios() -> None:
         return
 
     # Print header with styling
-    click.echo(click.style("\nRadioBridge - Supported Radio Models", fg="cyan", bold=True))
+    click.echo(
+        click.style("\nRadioBridge - Supported Radio Models", fg="cyan", bold=True)
+    )
     click.echo(click.style("=" * 50, fg="cyan"))
-    
+
     # Table headers with better spacing
-    header = f"{'#':<3} {'Mfg':<8} {'Model':<22} {'Version':<9} {'Firmware':<16} {'CPS'}"
+    header = (
+        f"{'#':<3} {'Mfg':<8} {'Model':<22} {'Version':<9} {'Firmware':<16} {'CPS'}"
+    )
     click.echo(click.style(header, fg="yellow", bold=True))
     click.echo(click.style("-" * 85, fg="yellow"))
 
@@ -485,12 +508,13 @@ def list_radios() -> None:
         fw_display = ", ".join(metadata.firmware_versions[:2])
         if len(metadata.firmware_versions) > 2:
             fw_display += "+"
-            
-        # Format CPS versions (limit to first 2 for display)  
-        cps_display = ", ".join(metadata.cps_versions[:2])
-        if len(metadata.cps_versions) > 2:
-            cps_display += "+"
-            
+
+        # Format CPS versions using the metadata's display formatting
+        cps_display = metadata._format_cps_display()
+        # Truncate if too long for display
+        if len(cps_display) > 50:
+            cps_display = cps_display[:47] + "..."
+
         # Color coding by manufacturer
         if metadata.manufacturer == "Anytone":
             mfg_color = "green"
@@ -498,7 +522,7 @@ def list_radios() -> None:
             mfg_color = "blue"
         else:
             mfg_color = "white"
-            
+
         # Truncate model name intelligently
         model_display = metadata.model
         if len(model_display) > 20:
@@ -506,7 +530,7 @@ def list_radios() -> None:
             model_display = model_display[:20] + "..."
         else:
             model_display = model_display[:20]
-            
+
         # Format version intelligently
         version_display = metadata.radio_version
         if version_display == "Standard":
@@ -514,29 +538,36 @@ def list_radios() -> None:
         elif version_display == "Plus":
             version_display = "Plus"
         version_display = version_display[:8]
-        
+
         # Create the row with proper color formatting
         parts = [
-            click.style(f"{index:<3}", fg='cyan', bold=True),
+            click.style(f"{index:<3}", fg="cyan", bold=True),
             click.style(f"{metadata.manufacturer:<8}", fg=mfg_color),
             f"{model_display:<22}",
             f"{version_display:<9}",
             f"{fw_display:<16}",
-            f"{cps_display}"
+            f"{cps_display}",
         ]
-        
+
         click.echo(" ".join(parts))
 
     # Usage examples
     click.echo("\n" + click.style("Usage Examples:", fg="cyan", bold=True))
-    click.echo(click.style("  By number: ", fg="white", bold=True) + 
-               click.style("rb format input.csv --radio 1", fg="green"))
-    click.echo(click.style("  By name:   ", fg="white", bold=True) + 
-               click.style("rb format input.csv --radio anytone-878", fg="green"))
-    
+    click.echo(
+        click.style("  By number: ", fg="white", bold=True)
+        + click.style("rb format input.csv --radio 1", fg="green")
+    )
+    click.echo(
+        click.style("  By name:   ", fg="white", bold=True)
+        + click.style("rb format input.csv --radio anytone-878", fg="green")
+    )
+
     # Additional info
-    click.echo("\n" + click.style("💡 Tip: ", fg="yellow", bold=True) + 
-               "Use numbers for quick selection or names for scripts")
+    click.echo(
+        "\n"
+        + click.style("💡 Tip: ", fg="yellow", bold=True)
+        + "Use numbers for quick selection or names for scripts"
+    )
     click.echo("")
 
 

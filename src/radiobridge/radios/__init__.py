@@ -14,6 +14,10 @@ from .anytone_878 import Anytone878Formatter
 from .anytone_578 import Anytone578Formatter
 from .baofeng_dm32uv import BaofengDM32UVFormatter
 from .baofeng_k5 import BaofengK5Formatter
+from .baofeng_uv5r import BaofengUV5RFormatter
+from .baofeng_uv28 import BaofengUV28Formatter
+from .baofeng_uv25 import BaofengUV25Formatter
+from .baofeng_uv5rm import BaofengUV5RMFormatter
 
 # Registry of all available radio formatters
 RADIO_FORMATTERS: Dict[str, Type[BaseRadioFormatter]] = {
@@ -21,6 +25,10 @@ RADIO_FORMATTERS: Dict[str, Type[BaseRadioFormatter]] = {
     "anytone-578": Anytone578Formatter,
     "baofeng-dm32uv": BaofengDM32UVFormatter,
     "baofeng-k5": BaofengK5Formatter,
+    "baofeng-uv5r": BaofengUV5RFormatter,
+    "baofeng-uv28": BaofengUV28Formatter,
+    "baofeng-uv25": BaofengUV25Formatter,
+    "baofeng-uv5rm": BaofengUV5RMFormatter,
 }
 
 # Aliases for common radio names
@@ -37,6 +45,22 @@ RADIO_ALIASES: Dict[str, str] = {
     "k5": "baofeng-k5",
     "k5plus": "baofeng-k5",
     "k5+": "baofeng-k5",
+    "uv5r": "baofeng-uv5r",
+    "uv-5r": "baofeng-uv5r",
+    "uv_5r": "baofeng-uv5r",
+    "5r": "baofeng-uv5r",
+    "uv28": "baofeng-uv28",
+    "uv-28": "baofeng-uv28",
+    "uv_28": "baofeng-uv28",
+    "28": "baofeng-uv28",
+    "uv25": "baofeng-uv25",
+    "uv-25": "baofeng-uv25",
+    "uv_25": "baofeng-uv25",
+    "25": "baofeng-uv25",
+    "uv5rm": "baofeng-uv5rm",
+    "uv-5rm": "baofeng-uv5rm",
+    "uv_5rm": "baofeng-uv5rm",
+    "5rm": "baofeng-uv5rm",
 }
 
 
