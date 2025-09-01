@@ -253,7 +253,7 @@ class TestModuleLogging:
         """Test that radio formatters generate appropriate logs."""
         from radiobridge.radios import get_radio_formatter
 
-        with caplog.at_level(logging.INFO):
+        with caplog.at_level(logging.DEBUG):
             formatter = get_radio_formatter("anytone-878")
             assert formatter is not None
 
@@ -339,12 +339,12 @@ class TestLoggingLevels:
         # Test that normal CLI output is preserved regardless of logging
         result = runner.invoke(main, ["list-radios"])
         assert result.exit_code == 0
-        assert "Supported radio models:" in result.output
+        assert "RadioBridge - Supported Radio Models" in result.output
 
         # Same test with verbose logging
         result = runner.invoke(main, ["--verbose", "list-radios"])
         assert result.exit_code == 0
-        assert "Supported radio models:" in result.output
+        assert "RadioBridge - Supported Radio Models" in result.output
 
 
 class TestFormatterLogging:

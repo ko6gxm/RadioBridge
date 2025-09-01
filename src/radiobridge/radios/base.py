@@ -25,7 +25,7 @@ class BaseRadioFormatter(ABC):
     def __init__(self):
         """Initialize the formatter."""
         self.logger = get_logger(self.__class__.__module__)
-        self.logger.info(f"Initialized {self.radio_name} formatter")
+        self.logger.debug(f"Initialized {self.radio_name} formatter")
 
     @property
     @abstractmethod
