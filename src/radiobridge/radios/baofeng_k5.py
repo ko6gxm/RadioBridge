@@ -43,16 +43,16 @@ class BaofengK5Formatter(BaseRadioFormatter):
                 manufacturer="Baofeng",
                 model="K5 Plus",
                 radio_version="v2.1",
-                firmware_versions=["2.1.8", "2.1.7"],
-                cps_versions=["K5-CPS 2.1.8", "CHIRP 20241201"],
+                firmware_versions=["2.1.8", "2.1.7", "2.1.6"],
+                cps_versions=["K5-CPS 2.1.8", "CHIRP-next 20240901-20250401"],
                 formatter_key="baofeng-k5",
             ),
             RadioMetadata(
                 manufacturer="Baofeng",
                 model="K5 Plus",
                 radio_version="v2.0",
-                firmware_versions=["2.0.5", "2.0.4"],
-                cps_versions=["K5-CPS 2.0.5", "CHIRP 20240901"],
+                firmware_versions=["2.0.5", "2.0.4", "2.0.3"],
+                cps_versions=["K5-CPS 2.0.5", "CHIRP-next 20240601-20241201"],
                 formatter_key="baofeng-k5",
             ),
         ]
@@ -107,7 +107,8 @@ class BaofengK5Formatter(BaseRadioFormatter):
                 self.logger.debug(f"Skipping row {idx}: no valid frequency found")
                 continue
 
-            # Get TX frequency - try detailed downloader first, then calculate from offset
+            # Get TX frequency - try detailed downloader first,
+            # then calculate from offset
             tx_freq_raw = self.get_tx_frequency(row)
             if tx_freq_raw:
                 tx_freq = self.clean_frequency(tx_freq_raw)

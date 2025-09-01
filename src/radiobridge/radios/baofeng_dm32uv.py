@@ -43,16 +43,16 @@ class BaofengDM32UVFormatter(BaseRadioFormatter):
                 manufacturer="Baofeng",
                 model="DM-32UV",
                 radio_version="v2",
-                firmware_versions=["2.14", "2.13"],
-                cps_versions=["2.14", "CHIRP 20241201"],
+                firmware_versions=["2.14", "2.13", "2.12"],
+                cps_versions=["DM-32UV CPS 2.14", "CHIRP-next 20240801-20250401"],
                 formatter_key="baofeng-dm32uv",
             ),
             RadioMetadata(
                 manufacturer="Baofeng",
                 model="DM-32UV",
                 radio_version="v1",
-                firmware_versions=["2.10", "2.09"],
-                cps_versions=["2.10", "CHIRP 20240901"],
+                firmware_versions=["2.10", "2.09", "2.08"],
+                cps_versions=["DM-32UV CPS 2.10", "CHIRP-next 20240301-20240801"],
                 formatter_key="baofeng-dm32uv",
             ),
         ]
@@ -255,7 +255,7 @@ class BaofengDM32UVFormatter(BaseRadioFormatter):
 
         Args:
             formatted_data: DataFrame with formatted channel information
-            csv_metadata: Metadata from CSV comments (contains county, state, city, etc.)
+            csv_metadata: Metadata from CSV comments (contains county, state, etc.)
             zone_strategy: Strategy for creating zones ('location', 'band', 'service')
             max_zones: Maximum number of zones to create
             max_channels_per_zone: Maximum channels per zone
@@ -298,7 +298,8 @@ class BaofengDM32UVFormatter(BaseRadioFormatter):
                         break
 
                     group_channels = channel_names[i : i + max_channels_per_zone]
-                    group_name = f"{zone_name}{zone_num}"  # e.g., "Riverside CA1", "Riverside CA2"
+                    # e.g., "Riverside CA1", "Riverside CA2"
+                    group_name = f"{zone_name}{zone_num}"
                     channel_members = "|".join(group_channels)
 
                     zones_data.append(

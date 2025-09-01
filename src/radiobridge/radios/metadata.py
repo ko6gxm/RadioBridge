@@ -35,12 +35,42 @@ class RadioMetadata:
         fw_str = (
             ", ".join(self.firmware_versions) if self.firmware_versions else "Unknown"
         )
-        cps_str = ", ".join(self.cps_versions) if self.cps_versions else "Unknown"
+        cps_str = self._format_cps_display() if self.cps_versions else "Unknown"
 
         return (
             f"{self.manufacturer} – {self.model} ({self.radio_version}) | "
             f"FW: {fw_str} | CPS: {cps_str}"
         )
+
+    def _format_cps_display(self) -> str:
+        """Format CPS versions for display, handling ranges intelligently."""
+        if not self.cps_versions:
+            return "Unknown"
+
+        display_parts = []
+
+        for cps_version in self.cps_versions:
+            if (
+                "CHIRP-next" in cps_version
+                and "-" in cps_version
+                and cps_version.count("-") >= 2
+            ):
+                # Handle version range like "CHIRP-next 20250101-20250301"
+                parts = cps_version.split()
+                if len(parts) >= 2 and "-" in parts[1]:
+                    name = parts[0]
+                    version_range = parts[1]
+                    if "-" in version_range:
+                        min_ver, max_ver = version_range.split("-", 1)
+                        display_parts.append(f"{name} {min_ver}+")
+                    else:
+                        display_parts.append(cps_version)
+                else:
+                    display_parts.append(cps_version)
+            else:
+                display_parts.append(cps_version)
+
+        return ", ".join(display_parts)
 
     def __repr__(self) -> str:
         """Developer-friendly representation."""
