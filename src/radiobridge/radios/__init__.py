@@ -35,7 +35,8 @@ RADIO_FORMATTERS: Dict[str, Type[BaseRadioFormatter]] = {
 
 # Aliases for common radio names
 RADIO_ALIASES: Dict[str, str] = {
-    "anytone878": "anytone-878-v3",  # Default to v3 for backward compatibility
+    "anytone-878": "anytone-878-v3",  # Default to v3 for backward compatibility
+    "anytone878": "anytone-878-v3",
     "anytone_878": "anytone-878-v3",
     "878": "anytone-878-v3",
     "anytone878v3": "anytone-878-v3",

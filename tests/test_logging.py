@@ -261,7 +261,7 @@ class TestModuleLogging:
             selection_logs = [
                 record.message
                 for record in caplog.records
-                if "Found direct match" in record.message
+                if "Found alias match" in record.message
             ]
             init_logs = [
                 record.message
@@ -364,10 +364,10 @@ class TestFormatterLogging:
 
     def test_anytone_878_formatter_logging(self, caplog):
         """Test logging in Anytone 878 formatter."""
-        from radiobridge.radios.anytone_878 import Anytone878Formatter
+        from radiobridge.radios.anytone_878_v3 import Anytone878V3Formatter
 
         with caplog.at_level(logging.DEBUG):
-            formatter = Anytone878Formatter()
+            formatter = Anytone878V3Formatter()
 
             # Should log initialization
             init_logs = [
@@ -518,11 +518,11 @@ class TestFormatterLogging:
 
     def test_formatter_error_logging(self, caplog):
         """Test that formatters log errors appropriately."""
-        from radiobridge.radios.anytone_878 import Anytone878Formatter
+        from radiobridge.radios.anytone_878_v3 import Anytone878V3Formatter
         import pandas as pd
 
         with caplog.at_level(logging.ERROR):
-            formatter = Anytone878Formatter()
+            formatter = Anytone878V3Formatter()
 
             # Test with empty DataFrame
             empty_data = pd.DataFrame()
