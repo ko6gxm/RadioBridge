@@ -7,7 +7,7 @@ important radio specifications.
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import List, Optional, Dict
+from typing import List, Optional
 from datetime import date
 
 from .metadata import RadioMetadata

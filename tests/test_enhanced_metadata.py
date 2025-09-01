@@ -1,7 +1,6 @@
 """Tests for enhanced radio metadata functionality."""
 
 import pytest
-from datetime import date
 from unittest import TestCase
 
 from radiobridge.radios.enhanced_metadata import (
@@ -11,7 +10,7 @@ from radiobridge.radios.enhanced_metadata import (
     FrequencyRange,
     PowerLevel,
     determine_band_count,
-    determine_form_factor_from_model
+    determine_form_factor_from_model,
 )
 from radiobridge.radios.metadata import RadioMetadata
 
