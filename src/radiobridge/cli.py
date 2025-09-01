@@ -273,8 +273,8 @@ def download(
         location_desc = location
         band_desc = format_band_list(bands)
         click.echo(
-            f"RadioBridge: Successfully downloaded {len(data)} repeaters from "
-            f"{location_desc} ({band_desc}) to {output}"
+            f"RadioBridge: Successfully downloaded {len(data)} repeaters "
+            f"from {location_desc} ({band_desc}) to {output}"
         )
         logger.info(
             f"Download completed: {len(data)} repeaters from {band_desc} "
@@ -420,8 +420,8 @@ def format(
         # Success message
         if len(files_created) == 1:
             click.echo(
-                f"RadioBridge: Successfully formatted {len(formatted_data)} repeaters "
-                f"for {formatter.radio_name} to {output}"
+                f"RadioBridge: Successfully formatted {len(formatted_data)} "
+                f"repeaters for {formatter.radio_name} to {output}"
             )
         else:
             click.echo(
