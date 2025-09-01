@@ -6,6 +6,13 @@ import pandas as pd
 
 from .base import BaseRadioFormatter
 from .metadata import RadioMetadata
+from .enhanced_metadata import (
+    EnhancedRadioMetadata,
+    FormFactor,
+    BandCount,
+    FrequencyRange,
+    PowerLevel,
+)
 
 
 class BaofengDM32UVFormatter(BaseRadioFormatter):
@@ -43,13 +50,57 @@ class BaofengDM32UVFormatter(BaseRadioFormatter):
                 manufacturer="Baofeng",
                 model="DM-32UV",
                 radio_version="Standard",
-                firmware_versions=["2.14", "2.13", "2.12", "2.10", "2.09", "2.08"],
+                firmware_versions=["v.046"],
                 cps_versions=[
-                    "DM_32UV_CPS_2.08_2.14",
                     "CHIRP_next_20240301_20250401",
-                    "OpenGD77_CPS_4.2.0_4.3.0",
+                    "DM_32UV_CPS_2.08_2.14",
                 ],
                 formatter_key="baofeng-dm32uv",
+            ),
+        ]
+
+    @property
+    def enhanced_metadata(self) -> List[EnhancedRadioMetadata]:
+        """Enhanced radio metadata with comprehensive specifications."""
+        # Frequency ranges for DM-32UV (dual-band)
+        frequency_ranges = [
+            FrequencyRange("VHF", 136.0, 174.0, 12.5),
+            FrequencyRange("UHF", 400.0, 520.0, 12.5),
+        ]
+
+        # Power levels for handheld radio
+        power_levels = [
+            PowerLevel("Low", 1.0, ["VHF", "UHF"]),
+            PowerLevel("High", 5.0, ["VHF", "UHF"]),
+        ]
+
+        return [
+            EnhancedRadioMetadata(
+                manufacturer="Baofeng",
+                model="DM-32UV",
+                radio_version="Standard",
+                firmware_versions=["v.046"],
+                cps_versions=[
+                    "CHIRP_next_20240301_20250401",
+                    "DM_32UV_CPS_2.08_2.14",
+                ],
+                formatter_key="baofeng-dm32uv",
+                # Enhanced metadata
+                form_factor=FormFactor.HANDHELD,
+                band_count=BandCount.DUAL_BAND,
+                max_power_watts=5.0,
+                frequency_ranges=frequency_ranges,
+                power_levels=power_levels,
+                modulation_modes=["FM", "DMR"],
+                digital_modes=["DMR"],  # Digital mode support
+                memory_channels=3000,
+                gps_enabled=False,
+                bluetooth_enabled=False,
+                display_type="Color LCD",
+                antenna_connector="SMA-Female",
+                dimensions_mm=(58, 112, 34),
+                weight_grams=280,
+                target_markets=["Amateur", "Commercial"],
             ),
         ]
 

@@ -1,4 +1,4 @@
-"""Formatter for Anytone AT-D578UV III (Plus) mobile radio."""
+"""Formatter for Anytone AT-D878UV II with firmware/CPS versions 3.00-3.08."""
 
 from typing import List, Optional
 
@@ -15,22 +15,22 @@ from .enhanced_metadata import (
 )
 
 
-class Anytone578Formatter(BaseRadioFormatter):
-    """Formatter for Anytone AT-D578UV III (Plus) mobile radio.
+class Anytone878V3Formatter(BaseRadioFormatter):
+    """Formatter for Anytone AT-D878UV II with firmware/CPS versions 3.00-3.08.
 
     This formatter converts repeater data into the CSV format expected by
-    the Anytone CPS (Customer Programming Software) for the mobile radio.
+    the Anytone firmware and CPS versions 3.00-3.08.
     """
 
     @property
     def radio_name(self) -> str:
         """Human-readable name of the radio."""
-        return "Anytone AT-D578UV III (Plus)"
+        return "Anytone AT-D878UV II (v3.0x)"
 
     @property
     def description(self) -> str:
         """Description of the radio and its capabilities."""
-        return "Dual-band DMR/Analog mobile radio with GPS and APRS"
+        return "Dual-band DMR/Analog handheld with GPS and Bluetooth (FW/CPS 3.0x)"
 
     @property
     def manufacturer(self) -> str:
@@ -40,7 +40,7 @@ class Anytone578Formatter(BaseRadioFormatter):
     @property
     def model(self) -> str:
         """Radio model."""
-        return "AT-D578UV III"
+        return "AT-D878UV II"
 
     @property
     def metadata(self) -> List[RadioMetadata]:
@@ -48,13 +48,23 @@ class Anytone578Formatter(BaseRadioFormatter):
         return [
             RadioMetadata(
                 manufacturer="Anytone",
-                model="AT-D578UV III Plus",
+                model="AT-D878UV II Plus",
                 radio_version="Plus",
-                firmware_versions=["2.08"],
-                cps_versions=[
-                    "Anytone_CPS_1.21",
+                firmware_versions=[
+                    "3.08",
+                    "3.07",
+                    "3.06",
+                    "3.05",
+                    "3.04",
+                    "3.03",
+                    "3.02",
+                    "3.01",
+                    "3.00",
                 ],
-                formatter_key="anytone-578",
+                cps_versions=[
+                    "Anytone_CPS_3.00_3.08",
+                ],
+                formatter_key="anytone-878-v3",
             ),
         ]
 
@@ -63,39 +73,64 @@ class Anytone578Formatter(BaseRadioFormatter):
         """Enhanced radio metadata with comprehensive specifications."""
         # Common frequency ranges for both variants
         frequency_ranges = [
-            FrequencyRange("VHF", 136.0, 174.0, 12.5),
-            FrequencyRange("UHF", 400.0, 520.0, 12.5),
+            FrequencyRange(
+                band_name="VHF",
+                min_freq_mhz=136.0,
+                max_freq_mhz=174.0,
+                step_size_khz=12.5,
+            ),
+            FrequencyRange(
+                band_name="UHF",
+                min_freq_mhz=400.0,
+                max_freq_mhz=520.0,
+                step_size_khz=12.5,
+            ),
         ]
 
-        # Power levels for mobile radio
+        # Power levels for handheld radio
         power_levels = [
-            PowerLevel("Low", 5.0, ["VHF", "UHF"]),
-            PowerLevel("Medium", 25.0, ["VHF", "UHF"]),
-            PowerLevel("High", 50.0, ["VHF", "UHF"]),
+            PowerLevel(name="Low", power_watts=1.0, bands=["VHF", "UHF"]),
+            PowerLevel(name="High", power_watts=7.0, bands=["VHF"]),
+            PowerLevel(
+                name="High", power_watts=6.0, bands=["UHF"]
+            ),  # Slightly lower on UHF
         ]
 
         return [
             EnhancedRadioMetadata(
                 manufacturer="Anytone",
-                model="AT-D578UV III Plus",
+                model="AT-D878UV II Plus",
                 radio_version="Plus",
-                firmware_versions=["2.08"],
-                cps_versions=[
-                    "Anytone_CPS_1.21",
+                firmware_versions=[
+                    "3.08",
+                    "3.07",
+                    "3.06",
+                    "3.05",
+                    "3.04",
+                    "3.03",
+                    "3.02",
+                    "3.01",
+                    "3.00",
                 ],
-                formatter_key="anytone-578",
+                cps_versions=[
+                    "Anytone_CPS_3.00_3.08",
+                ],
+                formatter_key="anytone-878-v3",
                 # Enhanced metadata
-                form_factor=FormFactor.MOBILE,
+                form_factor=FormFactor.HANDHELD,
                 band_count=BandCount.DUAL_BAND,
-                max_power_watts=50.0,
+                max_power_watts=7.0,
                 frequency_ranges=frequency_ranges,
                 power_levels=power_levels,
                 modulation_modes=["FM", "DMR"],
                 digital_modes=["DMR"],
                 memory_channels=4000,
                 gps_enabled=True,
+                bluetooth_enabled=True,
                 display_type="TFT Color LCD",
-                antenna_connector="SO-239",
+                antenna_connector="SMA-Female",
+                dimensions_mm=(58, 96, 32),
+                weight_grams=270,
                 target_markets=["Amateur", "Commercial"],
             ),
         ]
@@ -103,7 +138,7 @@ class Anytone578Formatter(BaseRadioFormatter):
     @property
     def required_columns(self) -> List[str]:
         """List of column names required in the input data."""
-        return []  # Accept both basic and detailed downloader formats
+        return ["frequency"]  # Minimum required - frequency
 
     @property
     def output_columns(self) -> List[str]:
@@ -133,7 +168,6 @@ class Anytone578Formatter(BaseRadioFormatter):
             "Scan List",
             "Group List",
             "GPS System",
-            "Roaming",
         ]
 
     def format(
@@ -142,25 +176,33 @@ class Anytone578Formatter(BaseRadioFormatter):
         start_channel: int = 1,
         cps_version: Optional[str] = None,
     ) -> pd.DataFrame:
-        """Format repeater data for Anytone 578.
+        """Format repeater data for Anytone 878 firmware/CPS 3.0x.
 
         Args:
             data: Input DataFrame with repeater information
             start_channel: Starting channel number (default: 1)
+            cps_version: CPS version to optimize output for (optional)
 
         Returns:
-            Formatted DataFrame ready for Anytone CPS import
+            Formatted DataFrame ready for Anytone firmware/CPS 3.0x import
         """
         self.validate_input(data)
 
         self.logger.info(f"Starting format operation for {len(data)} repeaters")
+        if cps_version:
+            self.logger.info(f"Optimizing output for CPS version: {cps_version}")
         self.logger.debug(f"Input columns: {list(data.columns)}")
+
+        # CPS-specific optimizations for 3.0x versions
+        use_chirp_format = cps_version and "chirp" in cps_version.lower()
+        if use_chirp_format:
+            self.logger.debug("Using CHIRP-optimized formatting")
 
         formatted_data = []
         channel_names = []  # Collect names for conflict resolution
 
         for idx, row in data.iterrows():
-            channel_num = idx + start_channel
+            channel = idx + start_channel
 
             # Get RX frequency (works with both basic and detailed downloader)
             rx_freq = self.clean_frequency(self.get_rx_frequency(row))
@@ -168,8 +210,7 @@ class Anytone578Formatter(BaseRadioFormatter):
                 self.logger.debug(f"Skipping row {idx}: no valid frequency found")
                 continue
 
-            # Get TX frequency - try detailed downloader first,
-            # then calculate from offset
+            # Get TX frequency - try detailed downloader first, then calculate from offset
             tx_freq_raw = self.get_tx_frequency(row)
             if tx_freq_raw:
                 tx_freq = self.clean_frequency(tx_freq_raw)
@@ -180,33 +221,36 @@ class Anytone578Formatter(BaseRadioFormatter):
                     try:
                         rx_float = float(rx_freq)
                         offset_float = float(offset)
-                        tx_freq = f"{rx_float + offset_float:.6f}"
+                        tx_freq = f"{rx_float + offset_float:.5f}"
                     except (ValueError, TypeError):
-                        tx_freq = rx_freq  # Simplex if offset calculation fails
+                        tx_freq = rx_freq
                 else:
-                    tx_freq = rx_freq  # Simplex
+                    tx_freq = rx_freq
 
-            # Get tone information (supports both new tone_up/tone_down and
-            # legacy tone columns)
+            # Get tone information
             tone_up, tone_down = self.get_tone_values(row)
 
-            # Generate channel name using base class helper (CallSign-Location format)
-            # Mobile radios can handle longer names (20 chars)
-            channel_name = self.build_channel_name(
-                row, max_length=20, location_slice=10
-            )
+            # Generate channel name using base class helper
+            channel_name = self.build_channel_name(row, max_length=16, location_slice=8)
             if not channel_name:
-                channel_name = f"CH{channel_num:03d}"
+                channel_name = f"CH{channel:03d}"
 
             channel_names.append(channel_name)
 
+            # Determine channel type (Analog or Digital)
+            channel_type = "Analog"  # Default to analog for compatibility
+
+            # Set power level
+            power = "High"  # Default to High power
+
+            # Format for firmware/CPS 3.0x
             formatted_row = {
-                "Channel Number": channel_num,
+                "Channel Number": channel,
                 "Channel Name": channel_name,
                 "Receive Frequency": rx_freq,
                 "Transmit Frequency": tx_freq,
-                "Channel Type": "A-Analog",
-                "Power": "High",  # Mobile radios typically high power
+                "Channel Type": channel_type,
+                "Power": power,
                 "Band Width": "25K",
                 "CTCSS/DCS Decode": tone_down if tone_down else "Off",
                 "CTCSS/DCS Encode": tone_up if tone_up else "Off",
@@ -219,18 +263,17 @@ class Anytone578Formatter(BaseRadioFormatter):
                 "DTMF ID": "None",
                 "2Tone ID": "None",
                 "5Tone ID": "None",
-                "PTT ID": "None",
+                "PTT ID": "Off",
                 "Color Code": "1",
                 "Slot": "1",
                 "Scan List": "None",
                 "Group List": "None",
                 "GPS System": "GPS",
-                "Roaming": "Off",
             }
 
             formatted_data.append(formatted_row)
             self.logger.debug(
-                f"Formatted channel {channel_num}: {channel_name} @ {rx_freq}"
+                f"Formatted channel {channel}: {channel_name} @ {rx_freq}"
             )
 
         if not formatted_data:
@@ -239,7 +282,7 @@ class Anytone578Formatter(BaseRadioFormatter):
 
         # Resolve channel name conflicts
         resolved_names = self.resolve_channel_name_conflicts(
-            channel_names, max_length=20
+            channel_names, max_length=16
         )
 
         # Update the channel names in formatted data

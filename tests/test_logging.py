@@ -261,7 +261,7 @@ class TestModuleLogging:
             selection_logs = [
                 record.message
                 for record in caplog.records
-                if "Found direct match" in record.message
+                if "Found alias match" in record.message
             ]
             init_logs = [
                 record.message
@@ -364,10 +364,10 @@ class TestFormatterLogging:
 
     def test_anytone_878_formatter_logging(self, caplog):
         """Test logging in Anytone 878 formatter."""
-        from radiobridge.radios.anytone_878 import Anytone878Formatter
+        from radiobridge.radios.anytone_878_v3 import Anytone878V3Formatter
 
         with caplog.at_level(logging.DEBUG):
-            formatter = Anytone878Formatter()
+            formatter = Anytone878V3Formatter()
 
             # Should log initialization
             init_logs = [
@@ -437,11 +437,11 @@ class TestFormatterLogging:
             assert len(result) == 3
 
     def test_baofeng_k5_formatter_logging(self, caplog):
-        """Test logging in Baofeng K5 formatter."""
-        from radiobridge.radios.baofeng_k5 import BaofengK5Formatter
+        """Test logging in Baofeng K5 Plus formatter."""
+        from radiobridge.radios.baofeng_k5_plus import BaofengK5PlusFormatter
 
         with caplog.at_level(logging.DEBUG):
-            formatter = BaofengK5Formatter()
+            formatter = BaofengK5PlusFormatter()
 
             # Should log initialization
             init_logs = [
@@ -518,11 +518,11 @@ class TestFormatterLogging:
 
     def test_formatter_error_logging(self, caplog):
         """Test that formatters log errors appropriately."""
-        from radiobridge.radios.anytone_878 import Anytone878Formatter
+        from radiobridge.radios.anytone_878_v3 import Anytone878V3Formatter
         import pandas as pd
 
         with caplog.at_level(logging.ERROR):
-            formatter = Anytone878Formatter()
+            formatter = Anytone878V3Formatter()
 
             # Test with empty DataFrame
             empty_data = pd.DataFrame()
@@ -571,11 +571,11 @@ class TestFormatterLogging:
 
     def test_formatter_input_validation_logging(self, caplog):
         """Test that formatters log input validation details."""
-        from radiobridge.radios.baofeng_k5 import BaofengK5Formatter
+        from radiobridge.radios.baofeng_k5_plus import BaofengK5PlusFormatter
         import pandas as pd
 
         with caplog.at_level(logging.DEBUG):
-            formatter = BaofengK5Formatter()
+            formatter = BaofengK5PlusFormatter()
 
             # Test with missing required column
             invalid_data = pd.DataFrame(

@@ -12,7 +12,7 @@
 |--------|----------|--------|--------|
 | `__init__.py` | 100% | ✅ Excellent | Core API exports |
 | `logging_config.py` | 100% | ✅ Excellent | Logging infrastructure |
-| `radios/baofeng_k5.py` | 86% | ✅ Very Good | K5 formatter |
+| `radios/baofeng_k5_plus.py` | 86% | ✅ Very Good | K5 Plus formatter |
 | `radios/anytone_878.py` | 84% | ✅ Very Good | 878 formatter |
 | `radios/anytone_578.py` | 83% | ✅ Very Good | 578 formatter |
 | `radios/__init__.py` | 82% | ✅ Very Good | Radio registry |

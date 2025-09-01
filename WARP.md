@@ -86,7 +86,7 @@ The project uses a registry pattern for radio formatters located in `src/radiobr
 **Key Components:**
 - `base.py`: `BaseRadioFormatter` abstract class with common utilities
 - `__init__.py`: `RADIO_FORMATTERS` registry maps radio names to formatter classes
-- Individual formatters: `anytone_878.py`, `anytone_578.py`, `baofeng_dm32uv.py`, `baofeng_k5.py`
+- Individual formatters: `anytone_878.py`, `anytone_578.py`, `baofeng_dm32uv.py`, `baofeng_k5_plus.py`
 
 **Supported Radio Models:**
 - Anytone AT-D878UV II Plus (handheld DMR/Analog)
