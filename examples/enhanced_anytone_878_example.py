@@ -8,14 +8,14 @@ enhanced metadata including form factor, band count, and maximum power.
 from datetime import date
 from typing import List
 
-from src.radiobridge.radios.enhanced_metadata import (
+from radiobridge.radios.enhanced_metadata import (
     EnhancedRadioMetadata,
-    FormFactor,
+    FormFactor, 
     BandCount,
     FrequencyRange,
-    PowerLevel,
+    PowerLevel
 )
-from src.radiobridge.radios.anytone_878 import Anytone878Formatter
+from radiobridge.radios.anytone_878 import Anytone878Formatter
 
 
 def create_enhanced_anytone_878_metadata() -> List[EnhancedRadioMetadata]:

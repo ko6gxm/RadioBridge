@@ -4,16 +4,16 @@ import pytest
 from datetime import date
 from unittest import TestCase
 
-from src.radiobridge.radios.enhanced_metadata import (
+from radiobridge.radios.enhanced_metadata import (
     EnhancedRadioMetadata,
     FormFactor,
     BandCount,
     FrequencyRange,
     PowerLevel,
     determine_band_count,
-    determine_form_factor_from_model,
+    determine_form_factor_from_model
 )
-from src.radiobridge.radios.metadata import RadioMetadata
+from radiobridge.radios.metadata import RadioMetadata
 
 
 class TestEnhancedRadioMetadata(TestCase):
