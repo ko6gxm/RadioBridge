@@ -1,10 +1,11 @@
 """Formatter for Anytone AT-D878UV II (Plus) handheld radio."""
 
-from typing import List
+from typing import List, Optional
 
 import pandas as pd
 
 from .base import BaseRadioFormatter
+from .metadata import RadioMetadata
 
 
 class Anytone878Formatter(BaseRadioFormatter):
@@ -33,6 +34,36 @@ class Anytone878Formatter(BaseRadioFormatter):
     def model(self) -> str:
         """Radio model."""
         return "AT-D878UV II"
+
+    @property
+    def metadata(self) -> List[RadioMetadata]:
+        """Radio metadata across five dimensions."""
+        return [
+            RadioMetadata(
+                manufacturer="Anytone",
+                model="AT-D878UV II Plus",
+                radio_version="Plus",
+                firmware_versions=["1.24", "1.23", "1.22"],
+                cps_versions=[
+                    "Anytone_CPS_3.00_3.08",
+                    "Anytone_CPS_4.00",
+                    "CHIRP_next_20240801_20250401",
+                ],
+                formatter_key="anytone-878",
+            ),
+            RadioMetadata(
+                manufacturer="Anytone",
+                model="AT-D878UV II",
+                radio_version="Standard",
+                firmware_versions=["1.20", "1.19"],
+                cps_versions=[
+                    "Anytone_CPS_2.50_2.58",
+                    "Anytone_CPS_3.00_3.05",
+                    "CHIRP_next_20240301_20240801",
+                ],
+                formatter_key="anytone-878",
+            ),
+        ]
 
     @property
     def required_columns(self) -> List[str]:
@@ -69,7 +100,12 @@ class Anytone878Formatter(BaseRadioFormatter):
             "GPS System",
         ]
 
-    def format(self, data: pd.DataFrame, start_channel: int = 1) -> pd.DataFrame:
+    def format(
+        self,
+        data: pd.DataFrame,
+        start_channel: int = 1,
+        cps_version: Optional[str] = None,
+    ) -> pd.DataFrame:
         """Format repeater data for Anytone 878.
 
         Args:

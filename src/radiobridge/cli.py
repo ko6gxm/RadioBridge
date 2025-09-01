@@ -25,7 +25,12 @@ from radiobridge.detailed_downloader import (
     download_with_details_by_city,
 )
 from radiobridge.logging_config import setup_logging, get_logger
-from radiobridge.radios import get_supported_radios, get_radio_formatter
+from radiobridge.radios import (
+    get_supported_radios,
+    get_radio_formatter,
+    list_radio_options,
+    resolve_by_index,
+)
 
 
 @click.group()
@@ -331,6 +336,10 @@ def download(
     default=64,
     help="Maximum channels per zone (default: 64)",
 )
+@click.option(
+    "--cps",
+    help="Specify the CPS (Customer Programming Software) version to optimize output for",
+)
 @click.pass_context
 def format(
     ctx: click.Context,
@@ -342,6 +351,7 @@ def format(
     zone_strategy: str,
     max_zones: int,
     max_channels_per_zone: int,
+    cps: Optional[str],
 ) -> None:
     """Format repeater data for a specific radio model."""
     logger = get_logger(__name__)
@@ -356,17 +366,47 @@ def format(
         data = read_csv(input_file, comment="#")
 
         # Get the formatter for the specified radio
-        formatter = get_radio_formatter(radio)
-        if formatter is None:
-            supported = ", ".join(get_supported_radios())
-            click.echo(
-                f"Error: Unsupported radio '{radio}'. Supported radios: {supported}",
-                err=True,
-            )
-            sys.exit(1)
+        # Try to resolve by index first if it's a number, otherwise by name
+        formatter = None
+        if radio.isdigit():
+            radio_index = int(radio)
+            formatter = resolve_by_index(radio_index)
+            if formatter is None:
+                max_options = len(list_radio_options())
+                click.echo(
+                    f"Error: Radio index '{radio_index}' is out of range "
+                    f"(1-{max_options}). Use 'rb list-radios' to see valid options.",
+                    err=True,
+                )
+                sys.exit(1)
+        else:
+            formatter = get_radio_formatter(radio)
+            if formatter is None:
+                supported = ", ".join(get_supported_radios())
+                click.echo(
+                    f"Error: Unsupported radio '{radio}'. "
+                    f"Supported radios: {supported}. "
+                    "Use 'rb list-radios' to see all options including numbers.",
+                    err=True,
+                )
+                sys.exit(1)
 
-        # Format the data with start channel
-        formatted_data = formatter.format(data, start_channel=start_channel)
+        # Validate CPS version if specified
+        if cps:
+            if not formatter.validate_cps_version(cps):
+                supported_versions = formatter.get_supported_cps_versions()
+                click.echo(
+                    f"Error: CPS version '{cps}' is not supported by {formatter.radio_name}. "
+                    f"Supported CPS versions: {', '.join(supported_versions)}",
+                    err=True,
+                )
+                sys.exit(1)
+            logger.info(f"Using CPS version: {cps}")
+
+        # Format the data with start channel and CPS version
+        formatted_data = formatter.format(
+            data, start_channel=start_channel, cps_version=cps
+        )
 
         if start_channel != 1:
             logger.info(f"Using custom start channel: {start_channel}")
@@ -442,16 +482,93 @@ def format(
 
 @main.command("list-radios")
 def list_radios() -> None:
-    """List all supported radio models."""
-    radios = get_supported_radios()
+    """List all supported radio models with numbered options."""
+    options = list_radio_options()
 
-    if not radios:
+    if not options:
         click.echo("No supported radios found.")
         return
 
-    click.echo("RadioBridge - Supported radio models:")
-    for radio in sorted(radios):
-        click.echo(f"  • {radio}")
+    # Print header with styling
+    click.echo(
+        click.style("\nRadioBridge - Supported Radio Models", fg="cyan", bold=True)
+    )
+    click.echo(click.style("=" * 50, fg="cyan"))
+
+    # Table headers with better spacing
+    header = (
+        f"{'#':<3} {'Mfg':<8} {'Model':<22} {'Version':<9} {'Firmware':<16} {'CPS'}"
+    )
+    click.echo(click.style(header, fg="yellow", bold=True))
+    click.echo(click.style("-" * 85, fg="yellow"))
+
+    # Table rows
+    for index, metadata in options:
+        # Format firmware versions (limit to first 2 for display)
+        fw_display = ", ".join(metadata.firmware_versions[:2])
+        if len(metadata.firmware_versions) > 2:
+            fw_display += "+"
+
+        # Format CPS versions using the metadata's display formatting
+        cps_display = metadata._format_cps_display()
+        # Truncate if too long for display
+        if len(cps_display) > 50:
+            cps_display = cps_display[:47] + "..."
+
+        # Color coding by manufacturer
+        if metadata.manufacturer == "Anytone":
+            mfg_color = "green"
+        elif metadata.manufacturer == "Baofeng":
+            mfg_color = "blue"
+        else:
+            mfg_color = "white"
+
+        # Truncate model name intelligently
+        model_display = metadata.model
+        if len(model_display) > 20:
+            # Try to keep the important parts
+            model_display = model_display[:20] + "..."
+        else:
+            model_display = model_display[:20]
+
+        # Format version intelligently
+        version_display = metadata.radio_version
+        if version_display == "Standard":
+            version_display = "Std"
+        elif version_display == "Plus":
+            version_display = "Plus"
+        version_display = version_display[:8]
+
+        # Create the row with proper color formatting
+        parts = [
+            click.style(f"{index:<3}", fg="cyan", bold=True),
+            click.style(f"{metadata.manufacturer:<8}", fg=mfg_color),
+            f"{model_display:<22}",
+            f"{version_display:<9}",
+            f"{fw_display:<16}",
+            f"{cps_display}",
+        ]
+
+        click.echo(" ".join(parts))
+
+    # Usage examples
+    click.echo("\n" + click.style("Usage Examples:", fg="cyan", bold=True))
+    click.echo(
+        click.style("  By number: ", fg="white", bold=True)
+        + click.style("rb format input.csv --radio 1", fg="green")
+    )
+    click.echo(
+        click.style("  By name:   ", fg="white", bold=True)
+        + click.style("rb format input.csv --radio anytone-878", fg="green")
+    )
+
+    # Additional info
+    click.echo(
+        "\n"
+        + click.style("💡 Tip: ", fg="yellow", bold=True)
+        + "Use numbers for quick selection or names for scripts"
+    )
+    click.echo("")
 
 
 if __name__ == "__main__":

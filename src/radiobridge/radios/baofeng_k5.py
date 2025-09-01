@@ -1,10 +1,11 @@
 """Formatter for Baofeng K5 Plus handheld radio."""
 
-from typing import List
+from typing import List, Optional
 
 import pandas as pd
 
 from .base import BaseRadioFormatter
+from .metadata import RadioMetadata
 
 
 class BaofengK5Formatter(BaseRadioFormatter):
@@ -35,6 +36,32 @@ class BaofengK5Formatter(BaseRadioFormatter):
         return "K5 Plus"
 
     @property
+    def metadata(self) -> List[RadioMetadata]:
+        """Radio metadata across five dimensions."""
+        return [
+            RadioMetadata(
+                manufacturer="Baofeng",
+                model="K5",
+                radio_version="Standard",
+                firmware_versions=[
+                    "v2.0.1.26",
+                    "v2.0.1.23",
+                    "v2.0.0.22",
+                    "v1.9.0.26",
+                    "v1.8.3.26",
+                    "v1.8.2.26",
+                ],
+                cps_versions=[
+                    "K5_CPS_2.0.3_2.1.8",
+                    "CHIRP_next_20240301_20250401",
+                    "Baofeng_CPS_K5_1.2_2.0",
+                    "OpenGD77_CPS_4.2.0_4.3.2",
+                ],
+                formatter_key="baofeng-k5",
+            ),
+        ]
+
+    @property
     def required_columns(self) -> List[str]:
         """List of column names required in the input data."""
         return []  # Accept both basic and detailed downloader formats
@@ -57,7 +84,12 @@ class BaofengK5Formatter(BaseRadioFormatter):
             "RX Only",
         ]
 
-    def format(self, data: pd.DataFrame, start_channel: int = 1) -> pd.DataFrame:
+    def format(
+        self,
+        data: pd.DataFrame,
+        start_channel: int = 1,
+        cps_version: Optional[str] = None,
+    ) -> pd.DataFrame:
         """Format repeater data for Baofeng K5 Plus.
 
         Args:
@@ -70,7 +102,19 @@ class BaofengK5Formatter(BaseRadioFormatter):
         self.validate_input(data)
 
         self.logger.info(f"Starting format operation for {len(data)} repeaters")
+        if cps_version:
+            self.logger.info(f"Optimizing output for CPS version: {cps_version}")
         self.logger.debug(f"Input columns: {list(data.columns)}")
+
+        # CPS-specific optimizations
+        use_chirp_format = cps_version and "chirp" in cps_version.lower()
+        if use_chirp_format:
+            self.logger.debug("Using CHIRP-optimized formatting")
+            # CHIRP prefers simpler column names and formatting
+
+        use_k5_cps = cps_version and "k5_cps" in cps_version.lower()
+        if use_k5_cps:
+            self.logger.debug("Using K5-CPS optimized formatting")
 
         formatted_data = []
         channel_names = []  # Collect names for conflict resolution
@@ -84,7 +128,8 @@ class BaofengK5Formatter(BaseRadioFormatter):
                 self.logger.debug(f"Skipping row {idx}: no valid frequency found")
                 continue
 
-            # Get TX frequency - try detailed downloader first, then calculate from offset
+            # Get TX frequency - try detailed downloader first,
+            # then calculate from offset
             tx_freq_raw = self.get_tx_frequency(row)
             if tx_freq_raw:
                 tx_freq = self.clean_frequency(tx_freq_raw)

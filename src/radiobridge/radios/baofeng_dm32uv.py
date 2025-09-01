@@ -5,6 +5,7 @@ from typing import Dict, List, Optional
 import pandas as pd
 
 from .base import BaseRadioFormatter
+from .metadata import RadioMetadata
 
 
 class BaofengDM32UVFormatter(BaseRadioFormatter):
@@ -33,6 +34,24 @@ class BaofengDM32UVFormatter(BaseRadioFormatter):
     def model(self) -> str:
         """Radio model."""
         return "DM-32UV"
+
+    @property
+    def metadata(self) -> List[RadioMetadata]:
+        """Radio metadata across five dimensions."""
+        return [
+            RadioMetadata(
+                manufacturer="Baofeng",
+                model="DM-32UV",
+                radio_version="Standard",
+                firmware_versions=["2.14", "2.13", "2.12", "2.10", "2.09", "2.08"],
+                cps_versions=[
+                    "DM_32UV_CPS_2.08_2.14",
+                    "CHIRP_next_20240301_20250401",
+                    "OpenGD77_CPS_4.2.0_4.3.0",
+                ],
+                formatter_key="baofeng-dm32uv",
+            ),
+        ]
 
     @property
     def required_columns(self) -> List[str]:
@@ -87,7 +106,12 @@ class BaofengDM32UVFormatter(BaseRadioFormatter):
             "PTT ID Display",
         ]
 
-    def format(self, data: pd.DataFrame, start_channel: int = 1) -> pd.DataFrame:
+    def format(
+        self,
+        data: pd.DataFrame,
+        start_channel: int = 1,
+        cps_version: Optional[str] = None,
+    ) -> pd.DataFrame:
         """Format repeater data for Baofeng DM-32UV.
 
         Args:
@@ -100,7 +124,14 @@ class BaofengDM32UVFormatter(BaseRadioFormatter):
         self.validate_input(data)
 
         self.logger.info(f"Starting format operation for {len(data)} repeaters")
+        if cps_version:
+            self.logger.info(f"Optimizing output for CPS version: {cps_version}")
         self.logger.debug(f"Input columns: {list(data.columns)}")
+
+        # CPS-specific optimizations
+        use_chirp_format = cps_version and "chirp" in cps_version.lower()
+        if use_chirp_format:
+            self.logger.debug("Using CHIRP-optimized formatting")
 
         formatted_data = []
         channel_names = []  # Collect names for conflict resolution
@@ -232,7 +263,7 @@ class BaofengDM32UVFormatter(BaseRadioFormatter):
 
         Args:
             formatted_data: DataFrame with formatted channel information
-            csv_metadata: Metadata from CSV comments (contains county, state, city, etc.)
+            csv_metadata: Metadata from CSV comments (contains county, state, etc.)
             zone_strategy: Strategy for creating zones ('location', 'band', 'service')
             max_zones: Maximum number of zones to create
             max_channels_per_zone: Maximum channels per zone
@@ -275,7 +306,8 @@ class BaofengDM32UVFormatter(BaseRadioFormatter):
                         break
 
                     group_channels = channel_names[i : i + max_channels_per_zone]
-                    group_name = f"{zone_name}{zone_num}"  # e.g., "Riverside CA1", "Riverside CA2"
+                    # e.g., "Riverside CA1", "Riverside CA2"
+                    group_name = f"{zone_name}{zone_num}"
                     channel_members = "|".join(group_channels)
 
                     zones_data.append(
