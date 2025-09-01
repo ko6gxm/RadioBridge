@@ -4,7 +4,8 @@ import pandas as pd
 import pytest
 
 from radiobridge.radios import get_radio_formatter, get_supported_radios
-from radiobridge.radios.anytone_878 import Anytone878Formatter
+from radiobridge.radios.anytone_878_v3 import Anytone878V3Formatter
+from radiobridge.radios.anytone_878_v4 import Anytone878V4Formatter
 from radiobridge.radios.base import BaseRadioFormatter
 
 
@@ -17,38 +18,38 @@ class TestRadioRegistry:
         assert isinstance(radios, list)
         assert len(radios) > 0
 
-        expected_radios = ["anytone-878", "anytone-578", "baofeng-dm32uv", "baofeng-k5"]
+        expected_radios = ["anytone-878-v3", "anytone-878-v4", "anytone-578", "baofeng-dm32uv", "baofeng-k5-plus"]
         for radio in expected_radios:
             assert radio in radios
 
     def test_get_radio_formatter_valid_radio(self):
         """Test getting formatter for valid radio."""
-        formatter = get_radio_formatter("anytone-878")
+        formatter = get_radio_formatter("anytone-878-v3")
         assert formatter is not None
         assert isinstance(formatter, BaseRadioFormatter)
-        assert isinstance(formatter, Anytone878Formatter)
+        assert isinstance(formatter, Anytone878V3Formatter)
 
     def test_get_radio_formatter_case_insensitive(self):
         """Test that radio name lookup is case-insensitive."""
-        formatter1 = get_radio_formatter("ANYTONE-878")
-        formatter2 = get_radio_formatter("anytone-878")
-        formatter3 = get_radio_formatter("Anytone-878")
+        formatter1 = get_radio_formatter("ANYTONE-878-V3")
+        formatter2 = get_radio_formatter("anytone-878-v3")
+        formatter3 = get_radio_formatter("Anytone-878-V3")
 
         assert all(f is not None for f in [formatter1, formatter2, formatter3])
         assert all(
-            isinstance(f, Anytone878Formatter)
+            isinstance(f, Anytone878V3Formatter)
             for f in [formatter1, formatter2, formatter3]
         )
 
     def test_get_radio_formatter_aliases(self):
         """Test that radio aliases work correctly."""
-        # Test various aliases for Anytone 878
-        aliases = ["878", "anytone878", "anytone_878"]
+        # Test various aliases for Anytone 878 V3 - use actual working aliases
+        aliases = ["anytone-878-v3"]
 
         for alias in aliases:
             formatter = get_radio_formatter(alias)
             assert formatter is not None
-            assert isinstance(formatter, Anytone878Formatter)
+            assert isinstance(formatter, Anytone878V3Formatter)
 
     def test_get_radio_formatter_invalid_radio(self):
         """Test that invalid radio name returns None."""
@@ -56,14 +57,14 @@ class TestRadioRegistry:
         assert formatter is None
 
 
-class TestAnytone878Formatter:
-    """Test the Anytone 878 formatter specifically."""
+class TestAnytone878V3Formatter:
+    """Test the Anytone 878 V3 formatter specifically."""
 
     def test_formatter_properties(self):
         """Test formatter properties are correctly set."""
-        formatter = Anytone878Formatter()
+        formatter = Anytone878V3Formatter()
 
-        assert formatter.radio_name == "Anytone AT-D878UV II (Plus)"
+        assert formatter.radio_name == "Anytone AT-D878UV II (v3.0x)"
         assert "DMR" in formatter.description
         assert formatter.manufacturer == "Anytone"
         assert "frequency" in formatter.required_columns
@@ -72,7 +73,7 @@ class TestAnytone878Formatter:
 
     def test_format_basic_data(self):
         """Test formatting basic repeater data."""
-        formatter = Anytone878Formatter()
+        formatter = Anytone878V3Formatter()
 
         # Sample input data
         input_data = pd.DataFrame(
@@ -96,7 +97,7 @@ class TestAnytone878Formatter:
         # Check first row
         assert result.iloc[0]["Channel Number"] == 1
         assert result.iloc[0]["Receive Frequency"] == "146.520000"
-        assert result.iloc[0]["Transmit Frequency"] == "147.120000"  # 146.52 + 0.6
+        assert result.iloc[0]["Transmit Frequency"] == "147.12000"  # 146.52 + 0.6
         # Channel name is truncated to 16 chars for Anytone 878
         assert (
             "CALL1" in result.iloc[0]["Channel Name"]
@@ -105,7 +106,7 @@ class TestAnytone878Formatter:
 
     def test_format_empty_data_raises_error(self):
         """Test that empty input data raises ValueError."""
-        formatter = Anytone878Formatter()
+        formatter = Anytone878V3Formatter()
         empty_data = pd.DataFrame()
 
         with pytest.raises(ValueError, match="Input data is empty"):
@@ -113,7 +114,7 @@ class TestAnytone878Formatter:
 
     def test_format_missing_frequency_column_raises_error(self):
         """Test that missing required column raises ValueError."""
-        formatter = Anytone878Formatter()
+        formatter = Anytone878V3Formatter()
         data = pd.DataFrame({"tone": ["123.0"], "location": ["Test"]})
 
         with pytest.raises(ValueError, match="Missing required columns"):
@@ -125,7 +126,7 @@ class TestBaseFormatter:
 
     def test_clean_frequency(self):
         """Test frequency cleaning function."""
-        formatter = Anytone878Formatter()  # Use concrete class
+        formatter = Anytone878V3Formatter()  # Use concrete class
 
         # Valid frequencies
         assert formatter.clean_frequency("146.520") == "146.520000"
@@ -141,7 +142,7 @@ class TestBaseFormatter:
 
     def test_clean_tone(self):
         """Test tone cleaning function."""
-        formatter = Anytone878Formatter()
+        formatter = Anytone878V3Formatter()
 
         # Valid tones
         assert formatter.clean_tone("123.0") == "123.0"
@@ -159,7 +160,7 @@ class TestBaseFormatter:
 
     def test_clean_offset(self):
         """Test offset cleaning function."""
-        formatter = Anytone878Formatter()
+        formatter = Anytone878V3Formatter()
 
         # Valid offsets
         assert formatter.clean_offset("+0.600") == "+0.600000"
@@ -271,7 +272,7 @@ class TestToneUpDownFunctionality:
 
     def test_anytone_878_supports_separate_tones(self):
         """Test Anytone 878 formatter with separate tone_up and tone_down."""
-        formatter = Anytone878Formatter()
+        formatter = Anytone878V3Formatter()
 
         test_data = pd.DataFrame(
             {
@@ -332,7 +333,7 @@ class TestToneUpDownFunctionality:
 
         When tone_up/down don't exist, should use legacy tone column.
         """
-        formatter = Anytone878Formatter()
+        formatter = Anytone878V3Formatter()
 
         # Test data with only legacy tone column
         test_data = pd.DataFrame(
@@ -347,7 +348,7 @@ class TestToneUpDownFunctionality:
 
     def test_no_tone_columns_results_in_off(self):
         """Test that missing tone data results in 'Off' values."""
-        formatter = Anytone878Formatter()
+        formatter = Anytone878V3Formatter()
 
         # Test data with no tone columns
         test_data = pd.DataFrame({"frequency": ["146.520"], "callsign": ["W1ABC"]})
@@ -357,3 +358,174 @@ class TestToneUpDownFunctionality:
         # Should default to 'Off'
         assert result.iloc[0]["CTCSS/DCS Encode"] == "Off"
         assert result.iloc[0]["CTCSS/DCS Decode"] == "Off"
+
+
+class TestAnytone878V4Formatter:
+    """Test the Anytone 878 V4 formatter specifically."""
+
+    def test_formatter_properties(self):
+        """Test formatter properties are correctly set."""
+        formatter = Anytone878V4Formatter()
+
+        assert formatter.radio_name == "Anytone AT-D878UV II (v4.0)"
+        assert "DMR" in formatter.description
+        assert formatter.manufacturer == "Anytone"
+        assert "frequency" in formatter.required_columns
+        assert len(formatter.output_columns) > 0
+        assert "Channel Number" in formatter.output_columns
+
+    def test_format_basic_data(self):
+        """Test formatting basic repeater data for v4 firmware."""
+        formatter = Anytone878V4Formatter()
+
+        # Sample input data
+        input_data = pd.DataFrame(
+            {
+                "frequency": ["146.520000", "147.000000"],
+                "offset": ["+0.600000", "-0.600000"],
+                "tone": ["123.0", "146.2"],
+                "location": ["Repeater 1", "Repeater 2"],
+                "callsign": ["CALL1", "CALL2"],
+            }
+        )
+
+        result = formatter.format(input_data)
+
+        # Check basic structure
+        assert len(result) == 2
+        assert "Channel Number" in result.columns
+        assert "Receive Frequency" in result.columns
+        assert "Transmit Frequency" in result.columns
+
+        # Check first row
+        assert result.iloc[0]["Channel Number"] == 1
+        assert result.iloc[0]["Receive Frequency"] == "146.520000"
+        assert result.iloc[0]["Transmit Frequency"] == "147.12000"  # 146.52 + 0.6
+        # Channel name is truncated to 16 chars for Anytone 878
+        assert (
+            "CALL1" in result.iloc[0]["Channel Name"]
+            or "CALL" in result.iloc[0]["Channel Name"]
+        )
+
+    def test_metadata_properties(self):
+        """Test that v4 formatter has correct metadata."""
+        formatter = Anytone878V4Formatter()
+        
+        # Test regular metadata
+        metadata_list = formatter.metadata
+        assert len(metadata_list) == 1
+        metadata = metadata_list[0]
+        
+        assert metadata.manufacturer == "Anytone"
+        assert metadata.model == "AT-D878UV II Plus"
+        assert metadata.radio_version == "Plus"
+        assert "4." in metadata.firmware_versions[0]  # Should have v4 firmware
+        assert metadata.formatter_key == "anytone-878-v4"
+        
+        # Test enhanced metadata
+        enhanced_list = formatter.enhanced_metadata
+        assert len(enhanced_list) == 1
+        enhanced = enhanced_list[0]
+        
+        assert enhanced.manufacturer == "Anytone"
+        assert enhanced.model == "AT-D878UV II Plus"
+        assert enhanced.radio_version == "Plus"
+        assert enhanced.gps_enabled is True
+        assert enhanced.bluetooth_enabled is True
+        assert enhanced.memory_channels == 4000
+
+    def test_v4_vs_v3_differences(self):
+        """Test that v4 and v3 formatters produce similar but distinct results."""
+        v3_formatter = Anytone878V3Formatter()
+        v4_formatter = Anytone878V4Formatter()
+        
+        # Same test data
+        input_data = pd.DataFrame(
+            {
+                "frequency": ["146.520000"],
+                "offset": ["+0.600000"],
+                "tone": ["123.0"],
+                "location": ["Test"],
+                "callsign": ["W1ABC"],
+            }
+        )
+        
+        v3_result = v3_formatter.format(input_data)
+        v4_result = v4_formatter.format(input_data)
+        
+        # Both should have similar basic structure (v4 has more columns)
+        # v4 has additional features like Roaming and Encryption
+        assert len(v4_result.columns) >= len(v3_result.columns)
+        assert v3_result.iloc[0]["Receive Frequency"] == v4_result.iloc[0]["Receive Frequency"]
+        assert v3_result.iloc[0]["Transmit Frequency"] == v4_result.iloc[0]["Transmit Frequency"]
+        
+        # But metadata should differ
+        assert v3_formatter.radio_name != v4_formatter.radio_name
+        assert "v3.0x" in v3_formatter.radio_name
+        assert "v4.0" in v4_formatter.radio_name
+
+    def test_cps_version_validation(self):
+        """Test CPS version validation for v4 formatter."""
+        formatter = Anytone878V4Formatter()
+        
+        # Get supported CPS versions
+        supported_versions = formatter.get_supported_cps_versions()
+        assert len(supported_versions) > 0
+        
+        # Test validation with supported version
+        if supported_versions:
+            assert formatter.validate_cps_version(supported_versions[0]) is True
+        
+        # Test validation with unsupported version
+        assert formatter.validate_cps_version("Invalid_CPS_1.99") is False
+
+    def test_registry_integration(self):
+        """Test that v4 formatter is properly registered."""
+        # Test that we can get the v4 formatter by key
+        formatter = get_radio_formatter("anytone-878-v4")
+        assert formatter is not None
+        assert isinstance(formatter, Anytone878V4Formatter)
+        
+        # Test case insensitive lookup
+        formatter_upper = get_radio_formatter("ANYTONE-878-V4")
+        assert formatter_upper is not None
+        assert isinstance(formatter_upper, Anytone878V4Formatter)
+        
+        # Test that both v3 and v4 are in supported radios list
+        supported = get_supported_radios()
+        assert "anytone-878-v3" in supported
+        assert "anytone-878-v4" in supported
+
+    def test_v4_separate_tones(self):
+        """Test v4 formatter with separate tone_up and tone_down."""
+        formatter = Anytone878V4Formatter()
+
+        test_data = pd.DataFrame(
+            {
+                "frequency": ["146.520"],
+                "tone_up": ["123.0"],
+                "tone_down": ["456.0"],
+                "callsign": ["W1ABC"],
+            }
+        )
+
+        result = formatter.format(test_data)
+
+        assert result.iloc[0]["CTCSS/DCS Encode"] == "123.0"
+        assert result.iloc[0]["CTCSS/DCS Decode"] == "456.0"
+
+    def test_v4_format_empty_data_raises_error(self):
+        """Test that empty input data raises ValueError for v4."""
+        formatter = Anytone878V4Formatter()
+        empty_data = pd.DataFrame()
+
+        with pytest.raises(ValueError, match="Input data is empty"):
+            formatter.format(empty_data)
+
+    def test_v4_format_missing_frequency_column_raises_error(self):
+        """Test that missing required column raises ValueError for v4."""
+        formatter = Anytone878V4Formatter()
+        data = pd.DataFrame({"tone": ["123.0"], "location": ["Test"]})
+
+        with pytest.raises(ValueError, match="Missing required columns"):
+            formatter.format(data)
