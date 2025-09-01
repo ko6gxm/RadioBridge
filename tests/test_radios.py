@@ -508,6 +508,576 @@ class TestAnytone878V4Formatter:
         assert "anytone-878-v3" in supported
         assert "anytone-878-v4" in supported
 
+
+class TestBaofengUV5RFormatter:
+    """Test the Baofeng UV-5R formatter specifically."""
+
+    def test_formatter_properties(self):
+        """Test formatter properties are correctly set."""
+        from radiobridge.radios.baofeng_uv5r import BaofengUV5RFormatter
+
+        formatter = BaofengUV5RFormatter()
+
+        assert formatter.radio_name == "Baofeng UV-5R"
+        assert "dual-band analog handheld" in formatter.description
+        assert formatter.manufacturer == "Baofeng"
+        assert formatter.model == "UV-5R"
+        assert (
+            formatter.required_columns == []
+        )  # Accepts both basic and detailed formats
+        assert len(formatter.output_columns) == 18  # UV-5R specific column count
+        assert "Location" in formatter.output_columns
+        assert "Name" in formatter.output_columns
+        assert "Frequency" in formatter.output_columns
+        assert "Duplex" in formatter.output_columns
+        assert "Mode" in formatter.output_columns
+
+    def test_metadata_properties(self):
+        """Test that UV-5R formatter has correct metadata."""
+        from radiobridge.radios.baofeng_uv5r import BaofengUV5RFormatter
+
+        formatter = BaofengUV5RFormatter()
+
+        # Test regular metadata
+        metadata_list = formatter.metadata
+        assert len(metadata_list) == 1
+        metadata = metadata_list[0]
+
+        assert metadata.manufacturer == "Baofeng"
+        assert metadata.model == "UV-5R"
+        assert metadata.radio_version == "Standard"
+        assert metadata.firmware_versions == []  # UV-5R firmware is not upgradable
+        assert len(metadata.cps_versions) > 0
+        assert "CHIRP" in metadata.cps_versions[0]
+        assert metadata.formatter_key == "baofeng-uv5r"
+
+    def test_enhanced_metadata_properties(self):
+        """Test enhanced metadata properties."""
+        from radiobridge.radios.baofeng_uv5r import BaofengUV5RFormatter
+
+        formatter = BaofengUV5RFormatter()
+
+        # Test enhanced metadata
+        enhanced_list = formatter.enhanced_metadata
+        assert len(enhanced_list) == 1
+        enhanced = enhanced_list[0]
+
+        assert enhanced.manufacturer == "Baofeng"
+        assert enhanced.model == "UV-5R"
+        assert enhanced.radio_version == "Standard"
+        assert enhanced.gps_enabled is False
+        assert enhanced.bluetooth_enabled is False
+        assert enhanced.memory_channels == 128
+        assert enhanced.max_power_watts == 8.0
+        assert "FM" in enhanced.modulation_modes
+        assert enhanced.digital_modes == []  # Analog only
+        assert len(enhanced.frequency_ranges) == 2  # VHF and UHF
+        assert enhanced.frequency_ranges[0].band_name == "VHF"
+        assert enhanced.frequency_ranges[1].band_name == "UHF"
+
+    def test_format_basic_simplex_data(self):
+        """Test formatting basic simplex repeater data."""
+        from radiobridge.radios.baofeng_uv5r import BaofengUV5RFormatter
+
+        formatter = BaofengUV5RFormatter()
+
+        # Sample simplex input data
+        input_data = pd.DataFrame(
+            {
+                "frequency": ["146.520000", "147.000000"],
+                "offset": ["0.000000", "0.000000"],
+                "tone": ["", "88.5"],
+                "location": ["Simplex 1", "Simplex 2"],
+                "callsign": ["W6ABC", "K6XYZ"],
+            }
+        )
+
+        result = formatter.format(input_data)
+
+        # Check basic structure
+        assert len(result) == 2
+        assert len(result.columns) == 18
+        assert "Location" in result.columns
+        assert "Name" in result.columns
+        assert "Frequency" in result.columns
+        assert "Duplex" in result.columns
+
+        # Check first row (no tone)
+        assert result.iloc[0]["Location"] == 1
+        assert result.iloc[0]["Frequency"] == "146.520000"
+        assert result.iloc[0]["Duplex"] == ""
+        assert result.iloc[0]["Offset"] == "0.000000"
+        assert result.iloc[0]["Mode"] == "FM"
+        assert result.iloc[0]["Tone"] == "None"
+        assert result.iloc[0]["TStep"] == "5.00"  # VHF step
+
+        # Check second row (with tone)
+        assert result.iloc[1]["Location"] == 2
+        assert result.iloc[1]["Frequency"] == "147.000000"
+        assert result.iloc[1]["Tone"] == "Tone"
+        assert result.iloc[1]["rToneFreq"] == "88.5"
+        assert result.iloc[1]["cToneFreq"] == "88.5"
+
+    def test_format_repeater_data_with_offsets(self):
+        """Test formatting repeater data with positive and negative offsets."""
+        from radiobridge.radios.baofeng_uv5r import BaofengUV5RFormatter
+
+        formatter = BaofengUV5RFormatter()
+
+        # Sample repeater input data
+        input_data = pd.DataFrame(
+            {
+                "frequency": ["146.520000", "447.000000"],
+                "offset": ["+0.600000", "-5.000000"],
+                "tone": ["123.0", ""],
+                "location": ["VHF Rptr", "UHF Rptr"],
+                "callsign": ["W6ABC", "K6XYZ"],
+            }
+        )
+
+        result = formatter.format(input_data)
+
+        # Check positive offset
+        assert result.iloc[0]["Frequency"] == "146.520000"
+        assert result.iloc[0]["Duplex"] == "+"
+        assert result.iloc[0]["Offset"] == "0.600000"
+        assert result.iloc[0]["TStep"] == "5.00"  # VHF step
+        assert result.iloc[0]["Tone"] == "Tone"
+        assert result.iloc[0]["rToneFreq"] == "123.0"
+
+        # Check negative offset
+        assert result.iloc[1]["Frequency"] == "447.000000"
+        assert result.iloc[1]["Duplex"] == "-"
+        assert result.iloc[1]["Offset"] == "5.000000"  # Absolute value
+        assert result.iloc[1]["TStep"] == "12.50"  # UHF step
+        assert result.iloc[1]["Tone"] == "None"
+
+    def test_format_with_tx_frequency(self):
+        """Test formatting with explicit TX frequency (detailed downloader)."""
+        from radiobridge.radios.baofeng_uv5r import BaofengUV5RFormatter
+
+        formatter = BaofengUV5RFormatter()
+
+        # Sample input data with TX frequency (using 'Uplink' column)
+        input_data = pd.DataFrame(
+            {
+                "frequency": ["146.520000"],
+                "Uplink": ["147.120000"],  # +0.6 offset
+                "location": ["Test Rptr"],
+                "callsign": ["W6ABC"],
+            }
+        )
+
+        result = formatter.format(input_data)
+
+        # Should calculate offset from TX/RX frequencies
+        assert result.iloc[0]["Frequency"] == "146.520000"
+        assert result.iloc[0]["Duplex"] == "+"
+        assert result.iloc[0]["Offset"] == "0.600000"
+
+    def test_format_with_dcs_tones(self):
+        """Test formatting with DCS tones."""
+        from radiobridge.radios.baofeng_uv5r import BaofengUV5RFormatter
+
+        formatter = BaofengUV5RFormatter()
+
+        # Sample input data with DCS tone
+        input_data = pd.DataFrame(
+            {
+                "frequency": ["146.520000"],
+                "tone": ["D023"],  # DCS code
+                "location": ["DCS Test"],
+                "callsign": ["W6ABC"],
+            }
+        )
+
+        result = formatter.format(input_data)
+
+        # Should set DCS mode
+        assert result.iloc[0]["Tone"] == "DTCS"
+        assert result.iloc[0]["DtcsCode"] == "023"
+        assert result.iloc[0]["DtcsPolarity"] == "NN"
+
+    def test_format_with_separate_tones(self):
+        """Test formatting with separate tone_up and tone_down."""
+        from radiobridge.radios.baofeng_uv5r import BaofengUV5RFormatter
+
+        formatter = BaofengUV5RFormatter()
+
+        # Sample input data with separate tones
+        input_data = pd.DataFrame(
+            {
+                "frequency": ["146.520000"],
+                "tone_up": ["123.0"],
+                "tone_down": ["88.5"],
+                "location": ["Split Tone"],
+                "callsign": ["W6ABC"],
+            }
+        )
+
+        result = formatter.format(input_data)
+
+        # Should use tone_up for ctone and tone_down for rtone
+        assert result.iloc[0]["Tone"] == "Tone"
+        assert result.iloc[0]["rToneFreq"] == "88.5"  # tone_down
+        assert result.iloc[0]["cToneFreq"] == "123.0"  # tone_up
+
+    def test_channel_name_generation(self):
+        """Test channel name generation and truncation."""
+        from radiobridge.radios.baofeng_uv5r import BaofengUV5RFormatter
+
+        formatter = BaofengUV5RFormatter()
+
+        # Test with various name combinations
+        input_data = pd.DataFrame(
+            {
+                "frequency": ["146.520000", "147.000000", "448.000000"],
+                "callsign": ["W6ABC", "VERYLONGCALL", ""],
+                "location": ["Los Angeles", "San Francisco Bay Area", "Short"],
+            }
+        )
+
+        result = formatter.format(input_data)
+
+        # Channel names should be 8 chars or less for UV-5R
+        assert len(result.iloc[0]["Name"]) <= 8
+        assert len(result.iloc[1]["Name"]) <= 8
+        assert len(result.iloc[2]["Name"]) <= 8
+
+        # Should contain recognizable parts
+        assert "W6ABC" in result.iloc[0]["Name"] or "Los" in result.iloc[0]["Name"]
+        assert len(result.iloc[2]["Name"]) > 0  # Should generate some name
+
+    def test_channel_name_conflict_resolution(self):
+        """Test channel name conflict resolution."""
+        from radiobridge.radios.baofeng_uv5r import BaofengUV5RFormatter
+
+        formatter = BaofengUV5RFormatter()
+
+        # Create data that would generate conflicting names
+        input_data = pd.DataFrame(
+            {
+                "frequency": ["146.520000", "147.000000", "448.000000"],
+                "callsign": ["W6ABC", "W6ABC", "W6ABC"],
+                "location": ["LA", "LA", "LA"],
+            }
+        )
+
+        result = formatter.format(input_data)
+
+        # Names should be unique after conflict resolution
+        names = result["Name"].tolist()
+        assert len(names) == len(set(names))  # All unique
+
+    def test_cps_version_optimization(self):
+        """Test CPS version-specific optimizations."""
+        from radiobridge.radios.baofeng_uv5r import BaofengUV5RFormatter
+
+        formatter = BaofengUV5RFormatter()
+
+        input_data = pd.DataFrame(
+            {
+                "frequency": ["146.520000"],
+                "location": ["Test"],
+                "callsign": ["W6ABC"],
+            }
+        )
+
+        # Test with CHIRP optimization
+        result_chirp = formatter.format(input_data, cps_version="CHIRP_next_20240301")
+        assert len(result_chirp) == 1
+
+        # Test with RT Systems optimization
+        result_rt = formatter.format(input_data, cps_version="RT_Systems_UV5R_1.0")
+        assert len(result_rt) == 1
+
+        # Both should produce valid results
+        assert result_chirp.iloc[0]["Frequency"] == "146.520000"
+        assert result_rt.iloc[0]["Frequency"] == "146.520000"
+
+    def test_frequency_step_calculation(self):
+        """Test frequency step calculation for different bands."""
+        from radiobridge.radios.baofeng_uv5r import BaofengUV5RFormatter
+
+        formatter = BaofengUV5RFormatter()
+
+        input_data = pd.DataFrame(
+            {
+                "frequency": [
+                    "146.520000",
+                    "447.000000",
+                    "100.000000",
+                ],  # VHF, UHF, out of band
+                "location": ["VHF", "UHF", "OOB"],
+            }
+        )
+
+        result = formatter.format(input_data)
+
+        # Check frequency steps
+        assert result.iloc[0]["TStep"] == "5.00"  # VHF
+        assert result.iloc[1]["TStep"] == "12.50"  # UHF
+        assert result.iloc[2]["TStep"] == "5.00"  # Default for out of band
+
+    def test_format_empty_data_raises_error(self):
+        """Test that empty input data raises ValueError."""
+        from radiobridge.radios.baofeng_uv5r import BaofengUV5RFormatter
+
+        formatter = BaofengUV5RFormatter()
+        empty_data = pd.DataFrame()
+
+        with pytest.raises(ValueError, match="Input data is empty"):
+            formatter.format(empty_data)
+
+    def test_format_invalid_frequency_skips_row(self):
+        """Test that rows with invalid frequencies are skipped."""
+        from radiobridge.radios.baofeng_uv5r import BaofengUV5RFormatter
+
+        formatter = BaofengUV5RFormatter()
+
+        # Mix of valid and invalid frequencies
+        input_data = pd.DataFrame(
+            {
+                "frequency": ["146.520000", "", "invalid", "447.000000"],
+                "location": ["Valid1", "Empty", "Invalid", "Valid2"],
+            }
+        )
+
+        result = formatter.format(input_data)
+
+        # Should only have 2 valid rows
+        assert len(result) == 2
+        assert result.iloc[0]["Frequency"] == "146.520000"
+        assert result.iloc[1]["Frequency"] == "447.000000"
+
+    def test_start_channel_parameter(self):
+        """Test start_channel parameter affects channel numbering."""
+        from radiobridge.radios.baofeng_uv5r import BaofengUV5RFormatter
+
+        formatter = BaofengUV5RFormatter()
+
+        input_data = pd.DataFrame(
+            {
+                "frequency": ["146.520000", "147.000000"],
+                "location": ["Ch1", "Ch2"],
+            }
+        )
+
+        # Test default start (1)
+        result_default = formatter.format(input_data)
+        assert result_default.iloc[0]["Location"] == 1
+        assert result_default.iloc[1]["Location"] == 2
+
+        # Test custom start (10)
+        result_custom = formatter.format(input_data, start_channel=10)
+        assert result_custom.iloc[0]["Location"] == 10
+        assert result_custom.iloc[1]["Location"] == 11
+
+    def test_registry_integration(self):
+        """Test that UV-5R formatter is properly registered."""
+        # Test that we can get the UV-5R formatter by key
+        formatter = get_radio_formatter("baofeng-uv5r")
+        assert formatter is not None
+        from radiobridge.radios.baofeng_uv5r import BaofengUV5RFormatter
+
+        assert isinstance(formatter, BaofengUV5RFormatter)
+
+        # Test aliases
+        formatter_alias = get_radio_formatter("uv5r")
+        assert formatter_alias is not None
+        assert isinstance(formatter_alias, BaofengUV5RFormatter)
+
+        # Test case insensitive lookup
+        formatter_upper = get_radio_formatter("BAOFENG-UV5R")
+        assert formatter_upper is not None
+        assert isinstance(formatter_upper, BaofengUV5RFormatter)
+
+        # Test that it's in supported radios list
+        supported = get_supported_radios()
+        assert "baofeng-uv5r" in supported
+
+
+class TestBaofengUV5RMFormatter:
+    """Test the Baofeng UV-5RM formatter specifically."""
+
+    def test_formatter_properties(self):
+        """Test formatter properties are correctly set."""
+        from radiobridge.radios.baofeng_uv5rm import BaofengUV5RMFormatter
+
+        formatter = BaofengUV5RMFormatter()
+
+        assert formatter.radio_name == "Baofeng UV-5RM"
+        assert "Enhanced UV-5R with additional memory" in formatter.description
+        assert formatter.manufacturer == "Baofeng"
+        assert formatter.model == "UV-5RM"
+        assert formatter.required_columns == []
+        assert len(formatter.output_columns) == 18  # Same as UV-5R
+
+    def test_enhanced_metadata_differences(self):
+        """Test enhanced metadata shows UV-5RM specific features."""
+        from radiobridge.radios.baofeng_uv5rm import BaofengUV5RMFormatter
+
+        formatter = BaofengUV5RMFormatter()
+        enhanced = formatter.enhanced_metadata[0]
+
+        assert enhanced.memory_channels == 999  # More than UV-5R's 128
+        assert enhanced.model == "UV-5RM"
+        assert (
+            "UV5RM" in enhanced.cps_versions[0] or "UV5RM" in enhanced.cps_versions[1]
+        )
+
+    def test_format_basic_data(self):
+        """Test basic formatting functionality."""
+        from radiobridge.radios.baofeng_uv5rm import BaofengUV5RMFormatter
+
+        formatter = BaofengUV5RMFormatter()
+
+        input_data = pd.DataFrame(
+            {
+                "frequency": ["146.520000"],
+                "tone": ["88.5"],
+                "callsign": ["W6ABC"],
+            }
+        )
+
+        result = formatter.format(input_data)
+
+        assert len(result) == 1
+        assert result.iloc[0]["Frequency"] == "146.520000"
+        assert result.iloc[0]["Mode"] == "FM"
+        assert result.iloc[0]["Tone"] == "Tone"
+        assert result.iloc[0]["rToneFreq"] == "88.5"
+
+    def test_registry_integration(self):
+        """Test UV-5RM is properly registered."""
+        formatter = get_radio_formatter("baofeng-uv5rm")
+        assert formatter is not None
+        from radiobridge.radios.baofeng_uv5rm import BaofengUV5RMFormatter
+
+        assert isinstance(formatter, BaofengUV5RMFormatter)
+
+
+class TestBaofengUV25Formatter:
+    """Test the Baofeng UV-25 formatter specifically."""
+
+    def test_formatter_properties(self):
+        """Test formatter properties are correctly set."""
+        from radiobridge.radios.baofeng_uv25 import BaofengUV25Formatter
+
+        formatter = BaofengUV25Formatter()
+
+        assert formatter.radio_name == "Baofeng UV-25"
+        assert "tri-band" in formatter.description.lower()
+        assert formatter.manufacturer == "Baofeng"
+        assert formatter.model == "UV-25"
+        assert formatter.required_columns == []
+        assert len(formatter.output_columns) == 18
+
+    def test_enhanced_metadata_tri_band(self):
+        """Test enhanced metadata shows tri-band capabilities."""
+        from radiobridge.radios.baofeng_uv25 import BaofengUV25Formatter
+
+        formatter = BaofengUV25Formatter()
+        enhanced = formatter.enhanced_metadata[0]
+
+        assert enhanced.model == "UV-25"
+        assert enhanced.band_count.value == "Tri Band"
+        assert len(enhanced.frequency_ranges) == 3  # VHF, UHF, 1.25m
+        # Check for 1.25m band (220-225 MHz)
+        band_names = [r.band_name for r in enhanced.frequency_ranges]
+        assert "1.25m" in band_names or "220MHz" in band_names
+
+    def test_format_basic_data(self):
+        """Test basic formatting functionality."""
+        from radiobridge.radios.baofeng_uv25 import BaofengUV25Formatter
+
+        formatter = BaofengUV25Formatter()
+
+        input_data = pd.DataFrame(
+            {
+                "frequency": ["223.500000"],  # 1.25m band
+                "offset": ["+1.600000"],
+                "callsign": ["W6ABC"],
+            }
+        )
+
+        result = formatter.format(input_data)
+
+        assert len(result) == 1
+        assert result.iloc[0]["Frequency"] == "223.500000"
+        assert result.iloc[0]["Duplex"] == "+"
+        assert result.iloc[0]["Offset"] == "1.600000"
+        assert result.iloc[0]["Mode"] == "FM"
+
+    def test_registry_integration(self):
+        """Test UV-25 is properly registered."""
+        formatter = get_radio_formatter("baofeng-uv25")
+        assert formatter is not None
+        from radiobridge.radios.baofeng_uv25 import BaofengUV25Formatter
+
+        assert isinstance(formatter, BaofengUV25Formatter)
+
+
+class TestBaofengUV28Formatter:
+    """Test the Baofeng UV-28 formatter specifically."""
+
+    def test_formatter_properties(self):
+        """Test formatter properties are correctly set."""
+        from radiobridge.radios.baofeng_uv28 import BaofengUV28Formatter
+
+        formatter = BaofengUV28Formatter()
+
+        assert formatter.radio_name == "Baofeng UV-28"
+        assert "tri-band" in formatter.description.lower()
+        assert formatter.manufacturer == "Baofeng"
+        assert formatter.model == "UV-28"
+        assert formatter.required_columns == []
+        assert len(formatter.output_columns) == 19
+
+    def test_enhanced_metadata_tri_band(self):
+        """Test enhanced metadata shows tri-band capabilities."""
+        from radiobridge.radios.baofeng_uv28 import BaofengUV28Formatter
+
+        formatter = BaofengUV28Formatter()
+        enhanced = formatter.enhanced_metadata[0]
+
+        assert enhanced.model == "UV-28"
+        assert enhanced.band_count.value == "Tri Band"
+        assert len(enhanced.frequency_ranges) == 3  # VHF, UHF, 1.25m
+        # Should support 1.25m band
+        band_names = [r.band_name for r in enhanced.frequency_ranges]
+        assert "1.25m" in band_names or "220MHz" in band_names
+
+    def test_format_basic_data(self):
+        """Test basic formatting functionality."""
+        from radiobridge.radios.baofeng_uv28 import BaofengUV28Formatter
+
+        formatter = BaofengUV28Formatter()
+
+        input_data = pd.DataFrame(
+            {
+                "frequency": ["222.000000"],  # 1.25m band
+                "tone": ["D023"],  # DCS tone
+                "callsign": ["W6ABC"],
+            }
+        )
+
+        result = formatter.format(input_data)
+
+        assert len(result) == 1
+        assert result.iloc[0]["Frequency"] == "222.000000"
+        assert result.iloc[0]["Tone"] == "DTCS"
+        assert result.iloc[0]["DtcsCode"] == "023"
+        assert result.iloc[0]["Mode"] == "FM"
+
+    def test_registry_integration(self):
+        """Test UV-28 is properly registered."""
+        formatter = get_radio_formatter("baofeng-uv28")
+        assert formatter is not None
+        from radiobridge.radios.baofeng_uv28 import BaofengUV28Formatter
+
+        assert isinstance(formatter, BaofengUV28Formatter)
+
     def test_v4_separate_tones(self):
         """Test v4 formatter with separate tone_up and tone_down."""
         formatter = Anytone878V4Formatter()
