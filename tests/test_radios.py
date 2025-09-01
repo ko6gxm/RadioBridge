@@ -18,7 +18,13 @@ class TestRadioRegistry:
         assert isinstance(radios, list)
         assert len(radios) > 0
 
-        expected_radios = ["anytone-878-v3", "anytone-878-v4", "anytone-578", "baofeng-dm32uv", "baofeng-k5-plus"]
+        expected_radios = [
+            "anytone-878-v3",
+            "anytone-878-v4",
+            "anytone-578",
+            "baofeng-dm32uv",
+            "baofeng-k5-plus",
+        ]
         for radio in expected_radios:
             assert radio in radios
 
@@ -410,23 +416,23 @@ class TestAnytone878V4Formatter:
     def test_metadata_properties(self):
         """Test that v4 formatter has correct metadata."""
         formatter = Anytone878V4Formatter()
-        
+
         # Test regular metadata
         metadata_list = formatter.metadata
         assert len(metadata_list) == 1
         metadata = metadata_list[0]
-        
+
         assert metadata.manufacturer == "Anytone"
         assert metadata.model == "AT-D878UV II Plus"
         assert metadata.radio_version == "Plus"
         assert "4." in metadata.firmware_versions[0]  # Should have v4 firmware
         assert metadata.formatter_key == "anytone-878-v4"
-        
+
         # Test enhanced metadata
         enhanced_list = formatter.enhanced_metadata
         assert len(enhanced_list) == 1
         enhanced = enhanced_list[0]
-        
+
         assert enhanced.manufacturer == "Anytone"
         assert enhanced.model == "AT-D878UV II Plus"
         assert enhanced.radio_version == "Plus"
@@ -438,7 +444,7 @@ class TestAnytone878V4Formatter:
         """Test that v4 and v3 formatters produce similar but distinct results."""
         v3_formatter = Anytone878V3Formatter()
         v4_formatter = Anytone878V4Formatter()
-        
+
         # Same test data
         input_data = pd.DataFrame(
             {
@@ -449,16 +455,22 @@ class TestAnytone878V4Formatter:
                 "callsign": ["W1ABC"],
             }
         )
-        
+
         v3_result = v3_formatter.format(input_data)
         v4_result = v4_formatter.format(input_data)
-        
+
         # Both should have similar basic structure (v4 has more columns)
         # v4 has additional features like Roaming and Encryption
         assert len(v4_result.columns) >= len(v3_result.columns)
-        assert v3_result.iloc[0]["Receive Frequency"] == v4_result.iloc[0]["Receive Frequency"]
-        assert v3_result.iloc[0]["Transmit Frequency"] == v4_result.iloc[0]["Transmit Frequency"]
-        
+        assert (
+            v3_result.iloc[0]["Receive Frequency"]
+            == v4_result.iloc[0]["Receive Frequency"]
+        )
+        assert (
+            v3_result.iloc[0]["Transmit Frequency"]
+            == v4_result.iloc[0]["Transmit Frequency"]
+        )
+
         # But metadata should differ
         assert v3_formatter.radio_name != v4_formatter.radio_name
         assert "v3.0x" in v3_formatter.radio_name
@@ -467,15 +479,15 @@ class TestAnytone878V4Formatter:
     def test_cps_version_validation(self):
         """Test CPS version validation for v4 formatter."""
         formatter = Anytone878V4Formatter()
-        
+
         # Get supported CPS versions
         supported_versions = formatter.get_supported_cps_versions()
         assert len(supported_versions) > 0
-        
+
         # Test validation with supported version
         if supported_versions:
             assert formatter.validate_cps_version(supported_versions[0]) is True
-        
+
         # Test validation with unsupported version
         assert formatter.validate_cps_version("Invalid_CPS_1.99") is False
 
@@ -485,12 +497,12 @@ class TestAnytone878V4Formatter:
         formatter = get_radio_formatter("anytone-878-v4")
         assert formatter is not None
         assert isinstance(formatter, Anytone878V4Formatter)
-        
+
         # Test case insensitive lookup
         formatter_upper = get_radio_formatter("ANYTONE-878-V4")
         assert formatter_upper is not None
         assert isinstance(formatter_upper, Anytone878V4Formatter)
-        
+
         # Test that both v3 and v4 are in supported radios list
         supported = get_supported_radios()
         assert "anytone-878-v3" in supported
