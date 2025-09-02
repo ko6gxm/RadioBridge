@@ -52,10 +52,11 @@ class BaofengUV25Formatter(BaseRadioFormatter):
                 manufacturer="Baofeng",
                 model="UV-25",
                 radio_version="Standard",
-                firmware_versions=[],  # UV-25 firmware is not upgradable
+                firmware_versions=["UV25-V1.0", "UV25-V1.1", "UV25-V1.2"],  # Common UV-25 firmware versions
                 cps_versions=[
                     "CHIRP_next_20240301_20250401",
                     "Baofeng_UV25_CPS_1.0_1.5",
+                    "RT_Systems_UV25_v2.0",
                 ],
                 formatter_key="baofeng-uv25",
             ),

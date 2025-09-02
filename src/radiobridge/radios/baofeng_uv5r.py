@@ -53,10 +53,11 @@ class BaofengUV5RFormatter(BaseRadioFormatter):
                 manufacturer="Baofeng",
                 model="UV-5R",
                 radio_version="Standard",
-                firmware_versions=[],  # UV-5R firmware is not upgradable
+                firmware_versions=["BFB297", "BFB298", "BFB299"],  # Common UV-5R firmware versions
                 cps_versions=[
                     "CHIRP_next_20240301_20250401",
                     "Baofeng_UV5R_CPS_1.0_2.1",
+                    "RT_Systems_UV5R_v4.0",
                 ],
                 formatter_key="baofeng-uv5r",
             ),
