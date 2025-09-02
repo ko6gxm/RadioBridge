@@ -1,8 +1,8 @@
 """Tests for Baofeng radio formatters (UV-5R, UV-5RM, UV-25, UV-28)."""
 
-import pandas as pd
 import pytest
 
+from radiobridge.lightweight_data import LightDataFrame
 from radiobridge.radios import get_radio_formatter
 from radiobridge.radios.baofeng_uv5r import BaofengUV5RFormatter
 from radiobridge.radios.baofeng_uv5rm import BaofengUV5RMFormatter
@@ -14,75 +14,132 @@ from radiobridge.radios.baofeng_uv28 import BaofengUV28Formatter
 @pytest.fixture
 def sample_repeater_data():
     """Sample repeater data for testing."""
-    return pd.DataFrame(
+    return LightDataFrame.from_records([
         {
-            "frequency": ["146.520000", "147.000000", "447.000000"],
-            "offset": ["+0.000000", "-0.600000", "-5.000000"],
-            "tone": ["", "123.0", "146.2"],
-            "location": ["Los Angeles", "San Francisco", "San Diego"],
-            "callsign": ["W6ABC", "K6XYZ", "N6DEF"],
+            "frequency": "146.520000",
+            "offset": "+0.000000",
+            "tone": "",
+            "location": "Los Angeles",
+            "callsign": "W6ABC",
+        },
+        {
+            "frequency": "147.000000",
+            "offset": "-0.600000",
+            "tone": "123.0",
+            "location": "San Francisco",
+            "callsign": "K6XYZ",
+        },
+        {
+            "frequency": "447.000000",
+            "offset": "-5.000000",
+            "tone": "146.2",
+            "location": "San Diego",
+            "callsign": "N6DEF",
         }
-    )
+    ])
 
 
 @pytest.fixture
 def detailed_downloader_data():
     """Sample detailed downloader data format."""
-    return pd.DataFrame(
+    return LightDataFrame.from_records([
         {
-            "Downlink": ["146.520000", "447.000000"],
-            "Uplink": ["146.520000", "442.000000"],
-            "Uplink Tone": ["123.0", ""],
-            "Downlink Tone": ["88.5", "146.2"],
-            "Location": ["Los Angeles", "San Diego"],
-            "callsign": ["W6ABC", "N6DEF"],
+            "Downlink": "146.520000",
+            "Uplink": "146.520000",
+            "Uplink Tone": "123.0",
+            "Downlink Tone": "88.5",
+            "Location": "Los Angeles",
+            "callsign": "W6ABC",
+        },
+        {
+            "Downlink": "447.000000",
+            "Uplink": "442.000000",
+            "Uplink Tone": "",
+            "Downlink Tone": "146.2",
+            "Location": "San Diego",
+            "callsign": "N6DEF",
         }
-    )
+    ])
 
 
 @pytest.fixture
 def tone_data():
     """Test data with separate tone_up and tone_down columns."""
-    return pd.DataFrame(
+    return LightDataFrame.from_records([
         {
-            "frequency": ["146.520000", "447.000000", "144.390000"],
-            "tone_up": ["123.0", "", "67.0"],
-            "tone_down": ["88.5", "146.2", "67.0"],
-            "callsign": ["W1ABC", "K2DEF", "N3GHI"],
-            "location": ["City1", "City2", "City3"],
+            "frequency": "146.520000",
+            "tone_up": "123.0",
+            "tone_down": "88.5",
+            "callsign": "W1ABC",
+            "location": "City1",
+        },
+        {
+            "frequency": "447.000000",
+            "tone_up": "",
+            "tone_down": "146.2",
+            "callsign": "K2DEF",
+            "location": "City2",
+        },
+        {
+            "frequency": "144.390000",
+            "tone_up": "67.0",
+            "tone_down": "67.0",
+            "callsign": "N3GHI",
+            "location": "City3",
         }
-    )
+    ])
 
 
 @pytest.fixture
 def dcs_tone_data():
     """Test data with DCS tones."""
-    return pd.DataFrame(
+    return LightDataFrame.from_records([
         {
-            "frequency": ["146.520000", "447.000000"],
-            "tone": ["D023", "D047"],
-            "callsign": ["W1DCS", "K2DCS"],
-            "location": ["DCS1", "DCS2"],
+            "frequency": "146.520000",
+            "tone": "D023",
+            "callsign": "W1DCS",
+            "location": "DCS1",
+        },
+        {
+            "frequency": "447.000000",
+            "tone": "D047",
+            "callsign": "K2DCS",
+            "location": "DCS2",
         }
-    )
+    ])
 
 
 @pytest.fixture
 def invalid_data():
     """Test data with invalid frequencies."""
-    return pd.DataFrame(
+    return LightDataFrame.from_records([
         {
-            "frequency": ["", "invalid", "146.520000", None],
-            "callsign": ["BAD1", "BAD2", "GOOD", "BAD3"],
-            "location": ["Test1", "Test2", "Test3", "Test4"],
+            "frequency": "",
+            "callsign": "BAD1",
+            "location": "Test1",
+        },
+        {
+            "frequency": "invalid",
+            "callsign": "BAD2",
+            "location": "Test2",
+        },
+        {
+            "frequency": "146.520000",
+            "callsign": "GOOD",
+            "location": "Test3",
+        },
+        {
+            "frequency": None,
+            "callsign": "BAD3",
+            "location": "Test4",
         }
-    )
+    ])
 
 
 @pytest.fixture
 def empty_data():
     """Empty DataFrame for testing."""
-    return pd.DataFrame()
+    return LightDataFrame.from_records([])
 
 
 # Formatter test parameters
@@ -205,30 +262,32 @@ class TestBaofengFormatterBasicFormatting:
         assert "Frequency" in result.columns
 
         # Check channel numbering
-        assert result.iloc[0]["Location"] == 1
-        assert result.iloc[1]["Location"] == 2
-        assert result.iloc[2]["Location"] == 3
+        assert result.iloc(0)["Location"] == 1
+        assert result.iloc(1)["Location"] == 2
+        assert result.iloc(2)["Location"] == 3
 
         # Check frequencies
-        assert result.iloc[0]["Frequency"] == "146.520000"
-        assert result.iloc[1]["Frequency"] == "147.000000"
-        assert result.iloc[2]["Frequency"] == "447.000000"
+        assert result.iloc(0)["Frequency"] == "146.520000"
+        assert result.iloc(1)["Frequency"] == "147.000000"
+        assert result.iloc(2)["Frequency"] == "447.000000"
 
         # Check duplex settings
-        assert result.iloc[0]["Duplex"] == ""  # Simplex
-        assert result.iloc[1]["Duplex"] == "-"  # Negative offset
-        assert result.iloc[2]["Duplex"] == "-"  # Negative offset
+        assert result.iloc(0)["Duplex"] == ""  # Simplex
+        assert result.iloc(1)["Duplex"] == "-"  # Negative offset
+        assert result.iloc(2)["Duplex"] == "-"  # Negative offset
 
         # Check offsets
-        assert result.iloc[0]["Offset"] == "0.000000"
-        assert result.iloc[1]["Offset"] == "0.600000"
-        assert result.iloc[2]["Offset"] == "5.000000"
+        assert result.iloc(0)["Offset"] == "0.000000"
+        assert result.iloc(1)["Offset"] == "0.600000"
+        assert result.iloc(2)["Offset"] == "5.000000"
 
         # Check mode is always FM for these radios
-        assert all(result["Mode"] == "FM")
+        modes = [result.iloc(i)["Mode"] for i in range(len(result))]
+        assert all(mode == "FM" for mode in modes)
 
         # Check channel names are within limits
-        for name in result["Name"]:
+        names = [result.iloc(i)["Name"] for i in range(len(result))]
+        for name in names:
             assert len(name) <= max_name_len
 
     @pytest.mark.parametrize(
@@ -250,12 +309,12 @@ class TestBaofengFormatterBasicFormatting:
 
         # Check structure
         assert len(result) == 2
-        assert result.iloc[0]["Frequency"] == "146.520000"  # Downlink becomes RX
-        assert result.iloc[1]["Frequency"] == "447.000000"
+        assert result.iloc(0)["Frequency"] == "146.520000"  # Downlink becomes RX
+        assert result.iloc(1)["Frequency"] == "447.000000"
 
         # Check duplex calculation from Downlink/Uplink
-        assert result.iloc[0]["Duplex"] == ""  # Simplex (same frequencies)
-        assert result.iloc[1]["Duplex"] == "-"  # Repeater (447 -> 442)
+        assert result.iloc(0)["Duplex"] == ""  # Simplex (same frequencies)
+        assert result.iloc(1)["Duplex"] == "-"  # Repeater (447 -> 442)
 
     @pytest.mark.parametrize(
         "formatter_class,registry_key,model,expected_columns,max_name_len",
@@ -275,9 +334,9 @@ class TestBaofengFormatterBasicFormatting:
 
         # Test custom start channel
         result = formatter.format(sample_repeater_data, start_channel=100)
-        assert result.iloc[0]["Location"] == 100
-        assert result.iloc[1]["Location"] == 101
-        assert result.iloc[2]["Location"] == 102
+        assert result.iloc(0)["Location"] == 100
+        assert result.iloc(1)["Location"] == 101
+        assert result.iloc(2)["Location"] == 102
 
     @pytest.mark.parametrize(
         "formatter_class,registry_key,model,expected_columns,max_name_len",
@@ -329,17 +388,17 @@ class TestBaofengFormatterToneHandling:
         result = formatter.format(tone_data)
 
         # Check tone mapping
-        assert result.iloc[0]["Tone"] == "Tone"  # Has tones
-        assert result.iloc[0]["rToneFreq"] == "88.5"  # tone_down
-        assert result.iloc[0]["cToneFreq"] == "123.0"  # tone_up
+        assert result.iloc(0)["Tone"] == "Tone"  # Has tones
+        assert result.iloc(0)["rToneFreq"] == "88.5"  # tone_down
+        assert result.iloc(0)["cToneFreq"] == "123.0"  # tone_up
 
-        assert result.iloc[1]["Tone"] == "Tone"  # Has tone_down only
-        assert result.iloc[1]["rToneFreq"] == "146.2"
-        assert result.iloc[1]["cToneFreq"] == "146.2"  # Should copy tone_down
+        assert result.iloc(1)["Tone"] == "Tone"  # Has tone_down only
+        assert result.iloc(1)["rToneFreq"] == "146.2"
+        assert result.iloc(1)["cToneFreq"] == "146.2"  # Should copy tone_down
 
-        assert result.iloc[2]["Tone"] == "Tone"  # Same tone for both
-        assert result.iloc[2]["rToneFreq"] == "67.0"
-        assert result.iloc[2]["cToneFreq"] == "67.0"
+        assert result.iloc(2)["Tone"] == "Tone"  # Same tone for both
+        assert result.iloc(2)["rToneFreq"] == "67.0"
+        assert result.iloc(2)["cToneFreq"] == "67.0"
 
     @pytest.mark.parametrize(
         "formatter_class,registry_key,model,expected_columns,max_name_len",
@@ -359,12 +418,12 @@ class TestBaofengFormatterToneHandling:
         result = formatter.format(dcs_tone_data)
 
         # Check DCS tone handling
-        assert result.iloc[0]["Tone"] == "DTCS"
-        assert result.iloc[0]["DtcsCode"] == "023"
-        assert result.iloc[0]["DtcsPolarity"] == "NN"
+        assert result.iloc(0)["Tone"] == "DTCS"
+        assert result.iloc(0)["DtcsCode"] == "023"
+        assert result.iloc(0)["DtcsPolarity"] == "NN"
 
-        assert result.iloc[1]["Tone"] == "DTCS"
-        assert result.iloc[1]["DtcsCode"] == "047"
+        assert result.iloc(1)["Tone"] == "DTCS"
+        assert result.iloc(1)["DtcsCode"] == "047"
 
     @pytest.mark.parametrize(
         "formatter_class,registry_key,model,expected_columns,max_name_len",
@@ -377,21 +436,21 @@ class TestBaofengFormatterToneHandling:
         formatter = formatter_class()
 
         # Data with no tone columns
-        no_tone_data = pd.DataFrame(
+        no_tone_data = LightDataFrame.from_records([
             {
-                "frequency": ["146.520000"],
-                "callsign": ["W1ABC"],
-                "location": ["Test"],
+                "frequency": "146.520000",
+                "callsign": "W1ABC",
+                "location": "Test",
             }
-        )
+        ])
 
         result = formatter.format(no_tone_data)
 
-        assert result.iloc[0]["Tone"] == "None"
-        assert result.iloc[0]["rToneFreq"] == "88.5"
-        assert result.iloc[0]["cToneFreq"] == "88.5"
-        assert result.iloc[0]["DtcsCode"] == "023"
-        assert result.iloc[0]["DtcsPolarity"] == "NN"
+        assert result.iloc(0)["Tone"] == "None"
+        assert result.iloc(0)["rToneFreq"] == "88.5"
+        assert result.iloc(0)["cToneFreq"] == "88.5"
+        assert result.iloc(0)["DtcsCode"] == "023"
+        assert result.iloc(0)["DtcsPolarity"] == "NN"
 
 
 class TestBaofengFormatterFrequencyHandling:
@@ -408,23 +467,27 @@ class TestBaofengFormatterFrequencyHandling:
         formatter = formatter_class()
 
         # Test VHF and UHF frequencies
-        test_data = pd.DataFrame(
+        test_data = LightDataFrame.from_records([
             {
-                "frequency": [
-                    "146.520000",
-                    "447.000000",
-                    "220.000000",
-                ],  # VHF, UHF, other
-                "callsign": ["VHF", "UHF", "OTHER"],
+                "frequency": "146.520000",
+                "callsign": "VHF",
+            },
+            {
+                "frequency": "447.000000",
+                "callsign": "UHF",
+            },
+            {
+                "frequency": "220.000000",
+                "callsign": "OTHER",
             }
-        )
+        ])
 
         result = formatter.format(test_data)
 
         # Check frequency steps
-        assert result.iloc[0]["TStep"] == "5.00"  # VHF
-        assert result.iloc[1]["TStep"] == "12.50"  # UHF
-        assert result.iloc[2]["TStep"] == "5.00"  # Default to 5.00 for other bands
+        assert result.iloc(0)["TStep"] == "5.00"  # VHF
+        assert result.iloc(1)["TStep"] == "12.50"  # UHF
+        assert result.iloc(2)["TStep"] == "5.00"  # Default to 5.00 for other bands
 
     @pytest.mark.parametrize(
         "formatter_class,registry_key,model,expected_columns,max_name_len",
@@ -437,26 +500,32 @@ class TestBaofengFormatterFrequencyHandling:
         formatter = formatter_class()
 
         # Test various offset scenarios
-        test_data = pd.DataFrame(
+        test_data = LightDataFrame.from_records([
             {
-                "frequency": ["146.520000", "146.520000", "146.520000"],
-                "offset": [
-                    "0.000000",
-                    "+0.000001",
-                    "-0.000001",
-                ],  # Zero, tiny positive, tiny negative
-                "callsign": ["ZERO", "TINY_POS", "TINY_NEG"],
+                "frequency": "146.520000",
+                "offset": "0.000000",
+                "callsign": "ZERO",
+            },
+            {
+                "frequency": "146.520000",
+                "offset": "+0.000001",
+                "callsign": "TINY_POS",
+            },
+            {
+                "frequency": "146.520000",
+                "offset": "-0.000001",
+                "callsign": "TINY_NEG",
             }
-        )
+        ])
 
         result = formatter.format(test_data)
 
         # Check that tiny offsets are treated as simplex
-        assert result.iloc[0]["Duplex"] == ""
-        assert result.iloc[0]["Offset"] == "0.000000"
+        assert result.iloc(0)["Duplex"] == ""
+        assert result.iloc(0)["Offset"] == "0.000000"
         # Tiny offsets should still be recognized
-        assert result.iloc[1]["Duplex"] == ""  # Less than 0.001 threshold
-        assert result.iloc[2]["Duplex"] == ""  # Less than 0.001 threshold
+        assert result.iloc(1)["Duplex"] == ""  # Less than 0.001 threshold
+        assert result.iloc(2)["Duplex"] == ""  # Less than 0.001 threshold
 
 
 class TestBaofengFormatterChannelNaming:
@@ -472,16 +541,16 @@ class TestBaofengFormatterChannelNaming:
         """Test channel name generation from callsign and location."""
         formatter = formatter_class()
 
-        test_data = pd.DataFrame(
+        test_data = LightDataFrame.from_records([
             {
-                "frequency": ["146.520000"],
-                "callsign": ["W6VERYLONGCALLSIGN"],
-                "location": ["Very Long Location Name That Exceeds Limits"],
+                "frequency": "146.520000",
+                "callsign": "W6VERYLONGCALLSIGN",
+                "location": "Very Long Location Name That Exceeds Limits",
             }
-        )
+        ])
 
         result = formatter.format(test_data)
-        channel_name = result.iloc[0]["Name"]
+        channel_name = result.iloc(0)["Name"]
 
         # Channel name should be within length limits
         assert len(channel_name) <= max_name_len
@@ -499,16 +568,26 @@ class TestBaofengFormatterChannelNaming:
         formatter = formatter_class()
 
         # Create data that would generate duplicate names
-        test_data = pd.DataFrame(
+        test_data = LightDataFrame.from_records([
             {
-                "frequency": ["146.520", "147.000", "448.000"],
-                "callsign": ["W6ABC", "W6ABC", "W6ABC"],  # Same callsign
-                "location": ["LA", "LA", "LA"],  # Same location
+                "frequency": "146.520",
+                "callsign": "W6ABC",
+                "location": "LA",
+            },
+            {
+                "frequency": "147.000",
+                "callsign": "W6ABC",
+                "location": "LA",
+            },
+            {
+                "frequency": "448.000",
+                "callsign": "W6ABC",
+                "location": "LA",
             }
-        )
+        ])
 
         result = formatter.format(test_data)
-        names = result["Name"].tolist()
+        names = [result.iloc(i)["Name"] for i in range(len(result))]
 
         # Names should be unique after conflict resolution
         assert len(names) == len(set(names))
@@ -523,19 +602,21 @@ class TestBaofengFormatterChannelNaming:
         """Test fallback channel names when no callsign/location data."""
         formatter = formatter_class()
 
-        test_data = pd.DataFrame(
+        test_data = LightDataFrame.from_records([
             {
-                "frequency": ["146.520000", "147.000000"],
-                # No callsign or location columns
+                "frequency": "146.520000",
+            },
+            {
+                "frequency": "147.000000",
             }
-        )
+        ])
 
         result = formatter.format(test_data)
 
         # Should generate fallback names
-        assert "CH" in result.iloc[0]["Name"]
-        assert "CH" in result.iloc[1]["Name"]
-        assert result.iloc[0]["Name"] != result.iloc[1]["Name"]  # Should be unique
+        assert "CH" in result.iloc(0)["Name"]
+        assert "CH" in result.iloc(1)["Name"]
+        assert result.iloc(0)["Name"] != result.iloc(1)["Name"]  # Should be unique
 
 
 class TestBaofengFormatterErrorHandling:
@@ -580,7 +661,7 @@ class TestBaofengFormatterErrorHandling:
 
         # Should only have 1 valid row (the one with "146.520000")
         assert len(result) == 1
-        assert result.iloc[0]["Frequency"] == "146.520000"
+        assert result.iloc(0)["Frequency"] == "146.520000"
 
     @pytest.mark.parametrize(
         "formatter_class,registry_key,model,expected_columns,max_name_len",
@@ -593,12 +674,20 @@ class TestBaofengFormatterErrorHandling:
         formatter = formatter_class()
 
         # All invalid frequencies
-        all_invalid_data = pd.DataFrame(
+        all_invalid_data = LightDataFrame.from_records([
             {
-                "frequency": ["", "invalid", None],
-                "callsign": ["BAD1", "BAD2", "BAD3"],
+                "frequency": "",
+                "callsign": "BAD1",
+            },
+            {
+                "frequency": "invalid",
+                "callsign": "BAD2",
+            },
+            {
+                "frequency": None,
+                "callsign": "BAD3",
             }
-        )
+        ])
 
         with pytest.raises(
             ValueError, match="No valid repeater data found after formatting"
@@ -615,21 +704,26 @@ class TestBaofengFormatterErrorHandling:
         """Test handling of invalid offset values."""
         formatter = formatter_class()
 
-        test_data = pd.DataFrame(
+        test_data = LightDataFrame.from_records([
             {
-                "frequency": ["146.520000", "147.000000"],
-                "offset": ["invalid", None],
-                "callsign": ["TEST1", "TEST2"],
+                "frequency": "146.520000",
+                "offset": "invalid",
+                "callsign": "TEST1",
+            },
+            {
+                "frequency": "147.000000",
+                "offset": None,
+                "callsign": "TEST2",
             }
-        )
+        ])
 
         result = formatter.format(test_data)
 
         # Should default to simplex for invalid offsets
-        assert result.iloc[0]["Duplex"] == ""
-        assert result.iloc[0]["Offset"] == "0.000000"
-        assert result.iloc[1]["Duplex"] == ""
-        assert result.iloc[1]["Offset"] == "0.000000"
+        assert result.iloc(0)["Duplex"] == ""
+        assert result.iloc(0)["Offset"] == "0.000000"
+        assert result.iloc(1)["Duplex"] == ""
+        assert result.iloc(1)["Offset"] == "0.000000"
 
 
 class TestUV28SpecificFeatures:
@@ -642,24 +736,25 @@ class TestUV28SpecificFeatures:
 
         # UV-28 should have Power column
         assert "Power" in result.columns
-        assert all(result["Power"] == "High")  # Default to High
+        power_values = [result.iloc(i)["Power"] for i in range(len(result))]
+        assert all(power == "High" for power in power_values)  # Default to High
 
     def test_uv28_longer_channel_names(self):
         """Test that UV-28 supports longer channel names."""
         formatter = BaofengUV28Formatter()
 
-        test_data = pd.DataFrame(
+        test_data = LightDataFrame.from_records([
             {
-                "frequency": ["146.520000"],
-                "callsign": ["W6VERYLONGCALL"],
-                "location": ["LongLocationName"],
+                "frequency": "146.520000",
+                "callsign": "W6VERYLONGCALL",
+                "location": "LongLocationName",
             }
-        )
+        ])
 
         result = formatter.format(test_data)
 
         # UV-28 should allow up to 12 character names
-        channel_name = result.iloc[0]["Name"]
+        channel_name = result.iloc(0)["Name"]
         assert len(channel_name) <= 12
         # Should be able to fit more characters than handheld radios
         assert len(channel_name) >= 8  # Should use more space available
@@ -708,15 +803,17 @@ class TestBaofengFormatterOutputValidation:
         result = formatter.format(sample_repeater_data)
 
         # Location should be numeric (channel numbers)
-        assert pd.api.types.is_integer_dtype(result["Location"]) or all(
-            isinstance(x, int) for x in result["Location"]
+        location_values = [result.iloc(i)["Location"] for i in range(len(result))]
+        assert all(
+            isinstance(x, int) for x in location_values
         )
 
         # Other fields should be strings
         string_columns = ["Name", "Frequency", "Duplex", "Offset", "Mode", "TStep"]
         for col in string_columns:
             if col in result.columns:
-                assert all(isinstance(x, str) for x in result[col])
+                col_values = [result.iloc(i)[col] for i in range(len(result))]
+                assert all(isinstance(x, str) for x in col_values)
 
     @pytest.mark.parametrize(
         "formatter_class,registry_key,model,expected_columns,max_name_len",
@@ -738,5 +835,11 @@ class TestBaofengFormatterOutputValidation:
         # These fields should never be empty
         required_fields = ["Location", "Name", "Frequency", "Mode"]
         for field in required_fields:
-            assert all(result[field] != "")
-            assert all(pd.notna(result[field]))
+            field_values = [result.iloc(i)[field] for i in range(len(result))]
+            if field == "Location":
+                # Location is numeric, check not zero/empty
+                assert all(x is not None and x != 0 for x in field_values)
+            else:
+                # String fields should not be empty
+                assert all(x != "" for x in field_values)
+                assert all(x is not None and str(x) != "nan" for x in field_values)

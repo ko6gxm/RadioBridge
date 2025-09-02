@@ -1,8 +1,9 @@
 """Download repeater data from RepeaterBook.com."""
 
+import tempfile
 from typing import Dict, List, Optional, Any
+from io import StringIO
 
-import pandas as pd
 import requests
 from bs4 import BeautifulSoup
 
@@ -10,6 +11,8 @@ from radiobridge.band_filter import (
     get_repeaterbook_band_param,
     filter_by_frequency,
 )
+from radiobridge.csv_utils import read_csv
+from radiobridge.lightweight_data import LightDataFrame, is_null
 from radiobridge.logging_config import get_logger
 
 
@@ -37,7 +40,7 @@ class RepeaterBookDownloader:
         state: str,
         country: str = "United States",
         bands: Optional[List[str]] = None,
-    ) -> pd.DataFrame:
+    ) -> LightDataFrame:
         """Download all repeaters for a specific state.
 
         Args:
@@ -46,7 +49,7 @@ class RepeaterBookDownloader:
             bands: List of amateur radio bands to include (e.g., ['2m', '70cm'])
 
         Returns:
-            DataFrame containing repeater information
+            LightDataFrame containing repeater information
 
         Raises:
             requests.RequestException: If download fails
@@ -60,7 +63,7 @@ class RepeaterBookDownloader:
         county: str,
         country: str = "United States",
         bands: Optional[List[str]] = None,
-    ) -> pd.DataFrame:
+    ) -> LightDataFrame:
         """Download all repeaters for a specific county.
 
         Args:
@@ -70,7 +73,7 @@ class RepeaterBookDownloader:
             bands: List of amateur radio bands to include (e.g., ['2m', '70cm'])
 
         Returns:
-            DataFrame containing repeater information
+            LightDataFrame containing repeater information
 
         Raises:
             requests.RequestException: If download fails
@@ -86,7 +89,7 @@ class RepeaterBookDownloader:
         city: str,
         country: str = "United States",
         bands: Optional[List[str]] = None,
-    ) -> pd.DataFrame:
+    ) -> LightDataFrame:
         """Download all repeaters for a specific city.
 
         Args:
@@ -96,7 +99,7 @@ class RepeaterBookDownloader:
             bands: List of amateur radio bands to include (e.g., ['2m', '70cm'])
 
         Returns:
-            DataFrame containing repeater information
+            LightDataFrame containing repeater information
 
         Raises:
             requests.RequestException: If download fails
@@ -106,7 +109,7 @@ class RepeaterBookDownloader:
             "city", state=state, city=city, country=country, bands=bands
         )
 
-    def _download(self, level: str, **kwargs) -> pd.DataFrame:
+    def _download(self, level: str, **kwargs) -> LightDataFrame:
         """Download repeater data at specified level.
 
         Args:
@@ -114,7 +117,7 @@ class RepeaterBookDownloader:
             **kwargs: Parameters for the specific level including 'bands'
 
         Returns:
-            DataFrame containing repeater information
+            LightDataFrame containing repeater information
         """
         bands = kwargs.get("bands") or ["all"]
         params = self._build_params(level, **kwargs)
@@ -127,8 +130,7 @@ class RepeaterBookDownloader:
                 f"Successfully downloaded data via CSV export ({len(csv_data)} rows)"
             )
             # Apply frequency-based band filtering
-            csv_data = filter_by_frequency(csv_data, bands)
-            return csv_data
+            return filter_by_frequency(csv_data, bands)
 
         self.logger.info("CSV export not available, falling back to HTML scraping")
         # Fall back to HTML scraping
@@ -187,7 +189,7 @@ class RepeaterBookDownloader:
         # RepeaterBook state ID mapping (US states)
         state_mapping = {
             "AL": "01",
-            "AK": "02",
+            "AK": "02", 
             "AZ": "04",
             "AR": "05",
             "CA": "06",
@@ -243,14 +245,14 @@ class RepeaterBookDownloader:
         self.logger.debug(f"Mapped state code '{state_code}' to ID '{state_id}'")
         return state_id
 
-    def _try_csv_export(self, params: Dict[str, Any]) -> Optional[pd.DataFrame]:
+    def _try_csv_export(self, params: Dict[str, Any]) -> Optional[LightDataFrame]:
         """Attempt to download CSV export if available.
 
         Args:
             params: Query parameters dictionary
 
         Returns:
-            DataFrame if CSV export is available, None otherwise
+            LightDataFrame if CSV export is available, None otherwise
         """
         # RepeaterBook.com CSV export URL pattern (this may need adjustment)
         csv_url = f"{self.BASE_URL}/repeaters/downloads/index.php"
@@ -285,10 +287,11 @@ class RepeaterBookDownloader:
             if response.status_code == 200 and "text/csv" in response.headers.get(
                 "content-type", ""
             ):
-                # Successfully got CSV data
-                from io import StringIO
-
-                return pd.read_csv(StringIO(response.text))
+                # Successfully got CSV data - save to temp file and read with our CSV reader
+                with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False) as temp_file:
+                    temp_file.write(response.text)
+                    temp_file.flush()
+                    return read_csv(temp_file.name)
 
         except Exception as e:
             # CSV export not available or failed, will fall back to HTML scraping
@@ -297,14 +300,14 @@ class RepeaterBookDownloader:
 
         return None
 
-    def _scrape_html_table(self, params: Dict[str, Any]) -> pd.DataFrame:
+    def _scrape_html_table(self, params: Dict[str, Any]) -> LightDataFrame:
         """Scrape repeater data from HTML table.
 
         Args:
             params: Query parameters dictionary
 
         Returns:
-            DataFrame containing scraped repeater data
+            LightDataFrame containing scraped repeater data
 
         Raises:
             requests.RequestException: If download fails
@@ -360,21 +363,19 @@ class RepeaterBookDownloader:
                 location_desc = f"Location {state_id}"
             raise ValueError(f"No repeater table found for {location_desc}")
 
-        # Convert HTML table to DataFrame
+        # Parse table with BeautifulSoup instead of pandas
         try:
-            # Use pandas read_html for easier table parsing
-            from io import StringIO
-
-            dfs = pd.read_html(StringIO(str(table)))
-            if not dfs:
+            table_data = self._parse_table_with_bs4(table)
+            if not table_data:
                 raise ValueError("No data found in HTML table")
 
-            df = dfs[0]  # Take the first (and likely only) table
+            # Convert to LightDataFrame
+            df = LightDataFrame.from_records(table_data)
             self.logger.info(
                 f"Successfully parsed HTML table: {len(df)} rows, "
                 f"{len(df.columns)} columns"
             )
-            self.logger.debug(f"Table columns: {list(df.columns)}")
+            self.logger.debug(f"Table columns: {df.columns}")
 
             # Basic cleaning
             df = self._clean_scraped_data(df)
@@ -386,34 +387,81 @@ class RepeaterBookDownloader:
             self.logger.error(f"Table parsing failed: {e}")
             raise ValueError(f"Failed to parse repeater table: {e}")
 
-    def _clean_scraped_data(self, df: pd.DataFrame) -> pd.DataFrame:
+    def _parse_table_with_bs4(self, table) -> List[Dict[str, Any]]:
+        """Parse HTML table using BeautifulSoup instead of pandas.
+        
+        Args:
+            table: BeautifulSoup table element
+            
+        Returns:
+            List of dictionaries representing table rows
+        """
+        rows = []
+        
+        # Get headers from first row
+        header_row = table.find('tr')
+        if not header_row:
+            return rows
+            
+        headers = []
+        for th in header_row.find_all(['th', 'td']):
+            header_text = th.get_text(strip=True)
+            headers.append(header_text)
+        
+        if not headers:
+            return rows
+        
+        # Get data rows (skip header row)
+        data_rows = table.find_all('tr')[1:]
+        
+        for row in data_rows:
+            cells = row.find_all(['td', 'th'])
+            if len(cells) >= len(headers):
+                row_dict = {}
+                for i, cell in enumerate(cells[:len(headers)]):
+                    cell_text = cell.get_text(strip=True)
+                    # Convert empty strings to None for consistency
+                    cell_value = cell_text if cell_text else None
+                    row_dict[headers[i]] = cell_value
+                rows.append(row_dict)
+        
+        return rows
+
+    def _clean_scraped_data(self, df: LightDataFrame) -> LightDataFrame:
         """Clean scraped HTML table data.
 
         Args:
-            df: Raw scraped DataFrame
+            df: Raw scraped LightDataFrame
 
         Returns:
-            Cleaned DataFrame
+            Cleaned LightDataFrame
         """
         self.logger.debug(
             f"Starting data cleaning: {len(df)} rows, {len(df.columns)} columns"
         )
 
-        # Remove any completely empty rows
+        # Remove completely empty rows
         rows_before = len(df)
-        df = df.dropna(how="all")
-        if len(df) < rows_before:
-            self.logger.debug(f"Removed {rows_before - len(df)} empty rows")
+        # Create a new dataframe with non-empty rows  
+        cleaned_rows = []
+        for i in range(len(df)):
+            row = df.iloc(i)
+            # Check if all values in the row are null/empty
+            all_empty = all(is_null(row.get(col)) for col in df.columns)
+            if not all_empty:
+                cleaned_rows.append(row.to_dict())
+        
+        if len(cleaned_rows) < rows_before:
+            self.logger.debug(f"Removed {rows_before - len(cleaned_rows)} empty rows")
+        
+        if not cleaned_rows:
+            return LightDataFrame()
+            
+        df = LightDataFrame.from_records(cleaned_rows)
 
-        # Strip whitespace from all string columns and replace empty strings with NaN
-        string_columns = df.select_dtypes(include=["object"]).columns
-        self.logger.debug(
-            f"Cleaning {len(string_columns)} string columns: {list(string_columns)}"
-        )
-        for col in string_columns:
-            if hasattr(df[col], "str"):
-                df[col] = df[col].str.strip()
-                df[col] = df[col].replace("", pd.NA)
+        # Strip whitespace from string columns
+        df.strip_strings()
+        self.logger.debug(f"Stripped whitespace from string columns")
 
         # Handle special case: "Tone Up / Down" column contains two tone values
         tone_up_down_cols = [
@@ -426,6 +474,7 @@ class RepeaterBookDownloader:
                 or "/" in str(col)
             )
         ]
+        
         if tone_up_down_cols:
             tone_col = tone_up_down_cols[0]
             self.logger.debug(
@@ -437,8 +486,10 @@ class RepeaterBookDownloader:
             tone_up_values = []
             tone_down_values = []
 
-            for value in df[tone_col]:
-                if pd.isna(value) or str(value).strip() in ["", "nan", "None"]:
+            tone_col_data = df[tone_col] if tone_col in df._data else [None] * len(df)
+            
+            for value in tone_col_data:
+                if is_null(value) or str(value).strip() in ["", "nan", "None"]:
                     tone_up_values.append(None)
                     tone_down_values.append(None)
                 else:
@@ -468,9 +519,18 @@ class RepeaterBookDownloader:
                     tone_down_values.append(tone_down if tone_down else None)
 
             # Add the new columns and remove the original
-            df["tone_up"] = tone_up_values
-            df["tone_down"] = tone_down_values
-            df = df.drop(columns=[tone_col])
+            # Create new data dict with the additional columns
+            new_data = df._data.copy()
+            new_data["tone_up"] = tone_up_values
+            new_data["tone_down"] = tone_down_values
+            
+            # Remove the original tone column
+            if tone_col in new_data:
+                del new_data[tone_col]
+                
+            # Update columns list
+            new_columns = [col for col in df.columns if col != tone_col] + ["tone_up", "tone_down"]
+            df = LightDataFrame(new_data, new_columns)
 
             self.logger.debug(
                 f"Split '{tone_col}' into 'tone_up' and 'tone_down' columns"
@@ -479,7 +539,7 @@ class RepeaterBookDownloader:
         # Try to standardize common column names
         column_mapping = {
             "Frequency": "frequency",
-            "Offset": "offset",
+            "Offset": "offset", 
             "Tone": "tone",
             "Call Sign": "callsign",
             "Callsign": "callsign",
@@ -492,15 +552,23 @@ class RepeaterBookDownloader:
         }
 
         # Rename columns if they match our mapping
-        original_columns = list(df.columns)
-        df.columns = [
+        original_columns = df.columns.copy()
+        new_columns = [
             column_mapping.get(col, str(col).lower().replace(" ", "_"))
             for col in df.columns
         ]
+        
+        # Create new data with renamed columns
+        new_data = {}
+        for old_col, new_col in zip(original_columns, new_columns):
+            if old_col in df._data:
+                new_data[new_col] = df._data[old_col]
+                
+        df = LightDataFrame(new_data, new_columns)
 
         renamed_cols = [
             f"{orig} -> {new}"
-            for orig, new in zip(original_columns, df.columns)
+            for orig, new in zip(original_columns, new_columns)
             if orig != new
         ]
         if renamed_cols:
@@ -514,7 +582,7 @@ def download_repeater_data(
     country: str = "United States",
     timeout: int = 30,
     bands: Optional[List[str]] = None,
-) -> pd.DataFrame:
+) -> LightDataFrame:
     """Download repeater data from RepeaterBook.com.
 
     This is a convenience function that creates a RepeaterBookDownloader
@@ -527,7 +595,7 @@ def download_repeater_data(
         bands: List of amateur radio bands to include (e.g., ['2m', '70cm'])
 
     Returns:
-        DataFrame containing repeater information
+        LightDataFrame containing repeater information
 
     Raises:
         requests.RequestException: If download fails
@@ -543,7 +611,7 @@ def download_repeater_data_by_county(
     country: str = "United States",
     timeout: int = 30,
     bands: Optional[List[str]] = None,
-) -> pd.DataFrame:
+) -> LightDataFrame:
     """Download repeater data for a specific county from RepeaterBook.com.
 
     This is a convenience function that creates a RepeaterBookDownloader
@@ -557,7 +625,7 @@ def download_repeater_data_by_county(
         bands: List of amateur radio bands to include (e.g., ['2m', '70cm'])
 
     Returns:
-        DataFrame containing repeater information
+        LightDataFrame containing repeater information
 
     Raises:
         requests.RequestException: If download fails
@@ -573,7 +641,7 @@ def download_repeater_data_by_city(
     country: str = "United States",
     timeout: int = 30,
     bands: Optional[List[str]] = None,
-) -> pd.DataFrame:
+) -> LightDataFrame:
     """Download repeater data for a specific city from RepeaterBook.com.
 
     This is a convenience function that creates a RepeaterBookDownloader
@@ -587,7 +655,7 @@ def download_repeater_data_by_city(
         bands: List of amateur radio bands to include (e.g., ['2m', '70cm'])
 
     Returns:
-        DataFrame containing repeater information
+        LightDataFrame containing repeater information
 
     Raises:
         requests.RequestException: If download fails

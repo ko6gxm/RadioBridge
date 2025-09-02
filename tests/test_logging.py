@@ -3,12 +3,12 @@
 import logging
 from unittest.mock import MagicMock, patch
 
-import pandas as pd
 import pytest
 from click.testing import CliRunner
 
 from radiobridge.cli import main
 from radiobridge.logging_config import setup_logging, get_logger
+from radiobridge.lightweight_data import LightDataFrame
 
 
 class TestLoggingConfig:
@@ -119,10 +119,8 @@ class TestCLILogging:
             # Use mock to avoid actual HTTP requests
             with patch("radiobridge.cli.download_with_details") as mock_download:
                 with patch("radiobridge.cli.write_csv"):
-                    # Create a proper pandas DataFrame mock
-                    import pandas as pd
-
-                    mock_data = pd.DataFrame(
+                    # Create a proper LightDataFrame mock
+                    mock_data = LightDataFrame(
                         {
                             "frequency": [
                                 "146.520",
@@ -233,10 +231,9 @@ class TestModuleLogging:
     def test_csv_utils_logging(self, caplog, tmp_path):
         """Test that CSV utilities generate appropriate logs."""
         from radiobridge.csv_utils import write_csv
-        import pandas as pd
 
         with caplog.at_level(logging.INFO):
-            test_data = pd.DataFrame({"frequency": ["146.520", "147.000"]})
+            test_data = LightDataFrame({"frequency": ["146.520", "147.000"]})
             output_file = tmp_path / "test.csv"
 
             write_csv(test_data, output_file)
@@ -275,11 +272,10 @@ class TestModuleLogging:
     def test_radio_formatter_validation_logging(self, caplog):
         """Test that radio formatter validation generates logs."""
         from radiobridge.radios import get_radio_formatter
-        import pandas as pd
 
         with caplog.at_level(logging.DEBUG):
             formatter = get_radio_formatter("anytone-878")
-            test_data = pd.DataFrame({"frequency": ["146.520"]})
+            test_data = LightDataFrame({"frequency": ["146.520"]})
 
             # This should log validation details
             result = formatter.validate_input(test_data)
@@ -352,7 +348,7 @@ class TestFormatterLogging:
 
     def setup_method(self):
         """Set up test data for formatter testing."""
-        self.test_data = pd.DataFrame(
+        self.test_data = LightDataFrame(
             {
                 "frequency": ["146.520", "147.000", "448.000"],
                 "callsign": ["W6ABC", "K6XYZ", "N6DEF"],
@@ -519,13 +515,12 @@ class TestFormatterLogging:
     def test_formatter_error_logging(self, caplog):
         """Test that formatters log errors appropriately."""
         from radiobridge.radios.anytone_878_v3 import Anytone878V3Formatter
-        import pandas as pd
 
         with caplog.at_level(logging.ERROR):
             formatter = Anytone878V3Formatter()
 
-            # Test with empty DataFrame
-            empty_data = pd.DataFrame()
+            # Test with empty LightDataFrame
+            empty_data = LightDataFrame()
 
             with pytest.raises(ValueError, match="Input data is empty"):
                 formatter.format(empty_data)
@@ -541,13 +536,12 @@ class TestFormatterLogging:
     def test_formatter_skip_invalid_data_logging(self, caplog):
         """Test that formatters log when skipping invalid data."""
         from radiobridge.radios.anytone_578 import Anytone578Formatter
-        import pandas as pd
 
         with caplog.at_level(logging.DEBUG):
             formatter = Anytone578Formatter()
 
             # Test data with some invalid frequencies
-            invalid_data = pd.DataFrame(
+            invalid_data = LightDataFrame(
                 {
                     "frequency": ["146.520", "", "invalid", "448.000"],
                     "callsign": ["W6ABC", "K6XYZ", "N6DEF", "K6GHI"],
@@ -572,13 +566,12 @@ class TestFormatterLogging:
     def test_formatter_input_validation_logging(self, caplog):
         """Test that formatters log input validation details."""
         from radiobridge.radios.baofeng_k5_plus import BaofengK5PlusFormatter
-        import pandas as pd
 
         with caplog.at_level(logging.DEBUG):
             formatter = BaofengK5PlusFormatter()
 
             # Test with missing required column
-            invalid_data = pd.DataFrame(
+            invalid_data = LightDataFrame(
                 {
                     "callsign": ["W6ABC"],
                     "location": ["LA"],

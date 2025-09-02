@@ -4,10 +4,10 @@ import tempfile
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-import pandas as pd
 from click.testing import CliRunner
 
 from radiobridge.cli import main
+from radiobridge.lightweight_data import LightDataFrame
 
 
 class TestDownloadCommand:
@@ -16,7 +16,7 @@ class TestDownloadCommand:
     def setup_method(self):
         """Set up test fixtures."""
         self.runner = CliRunner()
-        self.sample_data = pd.DataFrame(
+        self.sample_data = LightDataFrame(
             {
                 "frequency": ["146.520", "147.000"],
                 "callsign": ["W6ABC", "K6XYZ"],
@@ -302,7 +302,7 @@ class TestDownloadCommand:
     @patch("radiobridge.cli.write_csv_with_comments")
     def test_download_nohammer_with_detailed(self, mock_write_csv, mock_download):
         """Test nohammer functionality with detailed downloads."""
-        mock_data = pd.DataFrame(
+        mock_data = LightDataFrame(
             {"frequency": [145.200], "call": ["W6ABC"], "detail_sponsor": ["Test Club"]}
         )
         mock_download.return_value = mock_data
@@ -340,7 +340,7 @@ class TestDownloadCommand:
     @patch("radiobridge.cli.write_csv_with_comments")
     def test_download_nohammer_without_detailed(self, mock_write_csv, mock_download):
         """Test nohammer functionality without detailed downloads (should warn)."""
-        mock_data = pd.DataFrame({"frequency": [145.200], "call": ["W6ABC"]})
+        mock_data = LightDataFrame({"frequency": [145.200], "call": ["W6ABC"]})
         mock_download.return_value = mock_data
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -394,7 +394,7 @@ class TestBackwardCompatibility:
     ):
         """Test that format command is unchanged."""
         # Create mock data and formatter
-        mock_data = pd.DataFrame({"frequency": ["146.520"]})
+        mock_data = LightDataFrame({"frequency": ["146.520"]})
         mock_read_csv.return_value = mock_data
 
         mock_formatter = Mock()
