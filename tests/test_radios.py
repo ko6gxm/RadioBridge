@@ -211,7 +211,9 @@ class TestBaofengDM32UVFormatter:
         assert metadata.radio_version == "Standard"
         assert len(metadata.firmware_versions) > 0
         assert (
-            "2.14" in metadata.firmware_versions or "2.13" in metadata.firmware_versions
+            "v.046" in metadata.firmware_versions
+            or "2.14" in metadata.firmware_versions
+            or "2.13" in metadata.firmware_versions
         )
         assert len(metadata.cps_versions) >= 2
         assert (

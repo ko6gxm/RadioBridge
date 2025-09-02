@@ -10,17 +10,16 @@ from typing import List
 
 from radiobridge.radios.enhanced_metadata import (
     EnhancedRadioMetadata,
-    FormFactor, 
+    FormFactor,
     BandCount,
     FrequencyRange,
-    PowerLevel
+    PowerLevel,
 )
 from radiobridge.radios.anytone_878 import Anytone878Formatter
 
 
 def create_enhanced_anytone_878_metadata() -> List[EnhancedRadioMetadata]:
     """Create enhanced metadata for Anytone AT-D878UV II variants."""
-
     # Define common frequency ranges for dual-band VHF/UHF
     frequency_ranges = [
         FrequencyRange(
@@ -82,7 +81,7 @@ def create_enhanced_anytone_878_metadata() -> List[EnhancedRadioMetadata]:
         msrp_usd=189.99,
         target_markets=["Amateur", "Commercial"],
         # Legacy compatibility
-        legacy_description="Dual-band DMR/Analog handheld with GPS and Bluetooth",
+        legacy_description=("Dual-band DMR/Analog handheld with GPS and Bluetooth"),
     )
 
     # AT-D878UV II Standard (Basic version)
@@ -132,6 +131,7 @@ class EnhancedAnytone878Formatter(Anytone878Formatter):
     """Enhanced Anytone 878 formatter with comprehensive metadata."""
 
     def __init__(self):
+        """Initialize the enhanced formatter."""
         super().__init__()
         self._enhanced_metadata = create_enhanced_anytone_878_metadata()
 
@@ -194,7 +194,6 @@ class EnhancedAnytone878Formatter(Anytone878Formatter):
 
 def main():
     """Demonstration of enhanced metadata usage."""
-
     # Create enhanced formatter
     formatter = EnhancedAnytone878Formatter()
 
@@ -206,9 +205,8 @@ def main():
         print(f"  Form Factor: {metadata.form_factor.value}")
         print(f"  Band Count: {metadata.band_count.value}")
         print(f"  Max Power: {metadata.max_power_watts}W")
-        print(
-            f"  Frequency Range: {metadata.frequency_range_mhz[0]:.3f} - {metadata.frequency_range_mhz[1]:.3f} MHz"
-        )
+        freq_range = metadata.frequency_range_mhz
+        print(f"  Frequency Range: {freq_range[0]:.3f} - " f"{freq_range[1]:.3f} MHz")
         print(f"  Supported Bands: {', '.join(metadata.supported_bands)}")
         print(f"  Digital Modes: {', '.join(metadata.digital_modes)}")
         print(f"  Memory Channels: {metadata.memory_channels}")
@@ -226,9 +224,11 @@ def main():
         std_supported = formatter.supports_frequency(freq, "Standard")
         plus_power = formatter.get_power_for_frequency(freq, "Plus")
 
-        print(
-            f"{freq} MHz: Plus={plus_supported}, Standard={std_supported}, Power={plus_power}W"
+        result = (
+            f"{freq} MHz: Plus={plus_supported}, "
+            f"Standard={std_supported}, Power={plus_power}W"
         )
+        print(result)
 
     # Show backward compatibility
     print("\n=== Backward Compatibility ===")
