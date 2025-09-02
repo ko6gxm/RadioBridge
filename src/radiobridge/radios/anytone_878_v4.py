@@ -2,9 +2,8 @@
 
 from typing import List, Optional
 
-import pandas as pd
-
 from .base import BaseRadioFormatter
+from ..lightweight_data import LightDataFrame
 from .metadata import RadioMetadata
 from .enhanced_metadata import (
     EnhancedRadioMetadata,
@@ -154,19 +153,19 @@ class Anytone878V4Formatter(BaseRadioFormatter):
 
     def format(
         self,
-        data: pd.DataFrame,
+        data: LightDataFrame,
         start_channel: int = 1,
         cps_version: Optional[str] = None,
-    ) -> pd.DataFrame:
+    ) -> LightDataFrame:
         """Format repeater data for Anytone 878 firmware/CPS 4.0.
 
         Args:
-            data: Input DataFrame with repeater information
+            data: Input LightDataFrame with repeater information
             start_channel: Starting channel number (default: 1)
             cps_version: CPS version to optimize output for (optional)
 
         Returns:
-            Formatted DataFrame ready for Anytone firmware/CPS 4.0 import
+            Formatted LightDataFrame ready for Anytone firmware/CPS 4.0 import
         """
         self.validate_input(data)
 
@@ -183,7 +182,8 @@ class Anytone878V4Formatter(BaseRadioFormatter):
         formatted_data = []
         channel_names = []  # Collect names for conflict resolution
 
-        for idx, row in data.iterrows():
+        for idx in range(len(data)):
+            row = data.iloc(idx)
             channel = idx + start_channel
 
             # Get RX frequency (works with both basic and detailed downloader)
@@ -273,7 +273,7 @@ class Anytone878V4Formatter(BaseRadioFormatter):
         for i, resolved_name in enumerate(resolved_names):
             formatted_data[i]["Channel Name"] = resolved_name
 
-        result_df = pd.DataFrame(formatted_data)
+        result_df = LightDataFrame.from_records(formatted_data)
         self.logger.info(
             f"Format operation complete: {len(result_df)} channels formatted"
         )
