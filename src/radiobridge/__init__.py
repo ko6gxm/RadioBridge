@@ -7,7 +7,7 @@ and others with advanced targeting and rate limiting.
 
 __version__ = "0.3.0"
 __author__ = "Craig Simon"
-__email__ = "craig@example.com"
+__email__ = "craig@ko6gxm.com"
 
 from radiobridge.csv_utils import read_csv, write_csv
 from radiobridge.downloader import (
