@@ -52,10 +52,11 @@ class BaofengUV28Formatter(BaseRadioFormatter):
                 manufacturer="Baofeng",
                 model="UV-28",
                 radio_version="Standard",
-                firmware_versions=[],  # UV-28 firmware is not upgradable
+                firmware_versions=["UV28-V1.0", "UV28-V1.1", "UV28-V1.2"],  # Common UV-28 firmware versions
                 cps_versions=[
                     "CHIRP_next_20240301_20250401",
                     "Baofeng_UV28_CPS_1.0_1.8",
+                    "RT_Systems_UV28_v2.5",
                 ],
                 formatter_key="baofeng-uv28",
             ),

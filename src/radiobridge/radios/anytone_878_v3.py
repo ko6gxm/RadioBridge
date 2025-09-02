@@ -221,7 +221,7 @@ class Anytone878V3Formatter(BaseRadioFormatter):
                     try:
                         rx_float = float(rx_freq)
                         offset_float = float(offset)
-                        tx_freq = f"{rx_float + offset_float:.5f}"
+                        tx_freq = f"{rx_float + offset_float:.6f}"
                     except (ValueError, TypeError):
                         tx_freq = rx_freq
                 else:

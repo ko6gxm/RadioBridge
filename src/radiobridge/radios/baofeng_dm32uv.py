@@ -52,8 +52,8 @@ class BaofengDM32UVFormatter(BaseRadioFormatter):
                 radio_version="Standard",
                 firmware_versions=["v.046"],
                 cps_versions=[
-                    "CHIRP_next_20240301_20250401",
                     "DM_32UV_CPS_2.08_2.14",
+                    "CHIRP_next_20240301_20250401",
                 ],
                 formatter_key="baofeng-dm32uv",
             ),
