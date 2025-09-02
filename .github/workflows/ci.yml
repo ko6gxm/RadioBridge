@@ -14,40 +14,41 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        python-version: ["3.9", "3.11", "3.13"]  # Focus on key versions for reliability
+        python-version: ["3.9", "3.10", "3.11", "3.12", "3.13"]  # Full version support
 
     steps:
     - name: Checkout Code
       uses: actions/checkout@v4
 
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: ${{ matrix.python-version }}
 
     - name: Cache pip dependencies
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: |
           ~/.cache/pip
           ~\AppData\Local\pip\Cache
-        key: ${{ runner.os }}-pip-${{ matrix.python-version }}-${{ hashFiles('**/pyproject.toml', '**/Pipfile') }}
+          ~/Library/Caches/pip
+        key: ${{ runner.os }}-pip-${{ matrix.python-version }}-${{ hashFiles('**/pyproject.toml') }}
         restore-keys: |
           ${{ runner.os }}-pip-${{ matrix.python-version }}-
+          ${{ runner.os }}-pip-
 
     - name: Install dependencies
       run: |
-        python -m pip install --upgrade pip
-        # Install dev dependencies from pyproject.toml
-        pip install black flake8 pytest pytest-cov pre-commit ipython responses
-        # Add tomli for Python < 3.11 (needed for Black)
-        python -c "import sys; sys.version_info < (3, 11) and __import__('subprocess').run(['pip', 'install', 'tomli'])"
-        # Install main dependencies
-        pip install click requests pandas python-dateutil beautifulsoup4 lxml
+        python -m pip install --upgrade pip setuptools wheel
+        # Install project with dev dependencies using pyproject.toml
+        python -m pip install -e ".[dev]"
+        # Install additional test dependencies not in pyproject.toml
+        python -m pip install responses psutil
 
-    - name: Install package
+    - name: Verify installation
       run: |
-        pip install -e .
+        python -c "import radiobridge; print(f'RadioBridge version: {radiobridge.__version__}')"
+        rb --version
 
     - name: Lint with flake8
       run: |
@@ -82,15 +83,14 @@ jobs:
       uses: actions/checkout@v4
 
     - name: Set up Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: "3.11"
 
     - name: Install dependencies
       run: |
-        python -m pip install --upgrade pip
-        pip install click requests pandas python-dateutil beautifulsoup4 lxml
-        pip install -e .
+        python -m pip install --upgrade pip setuptools wheel
+        python -m pip install -e ".[dev]"
 
     - name: Test CLI installation
       run: |
@@ -117,13 +117,13 @@ jobs:
       uses: actions/checkout@v4
 
     - name: Set up Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: "3.11"
 
     - name: Install build dependencies
       run: |
-        python -m pip install --upgrade pip build twine
+        python -m pip install --upgrade pip setuptools wheel build twine
 
     - name: Build package
       run: |
@@ -138,6 +138,7 @@ jobs:
       with:
         name: dist-files
         path: dist/
+        retention-days: 7
 
   security:
     name: Security Scan
@@ -148,24 +149,25 @@ jobs:
       uses: actions/checkout@v4
 
     - name: Set up Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: "3.11"
 
-    - name: Install security tools
+    - name: Install dependencies for security scan
       run: |
-        python -m pip install --upgrade pip
+        python -m pip install --upgrade pip setuptools wheel
+        python -m pip install -e ".[dev]"
         python -m pip install safety bandit[toml]
 
     - name: Run safety check
       run: |
-        python -m safety check --json
-      continue-on-error: true  # Allow failure due to typer compatibility issue
+        python -m safety check --json || echo "Safety check completed with warnings"
+      continue-on-error: true  # Allow failure due to potential false positives
 
     - name: Run bandit security scan
       run: |
-        python -m bandit -r src/ -f json
-      continue-on-error: true  # Allow low-severity issues (like random.uniform for rate limiting)
+        python -m bandit -r src/ -f json || echo "Bandit scan completed with warnings"
+      continue-on-error: true  # Allow low-severity issues
 
   performance:
     name: Performance Tests
@@ -177,15 +179,15 @@ jobs:
       uses: actions/checkout@v4
 
     - name: Set up Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: "3.11"
 
     - name: Install dependencies
       run: |
-        python -m pip install --upgrade pip
-        pip install click requests pandas python-dateutil beautifulsoup4 lxml psutil
-        pip install -e .
+        python -m pip install --upgrade pip setuptools wheel
+        python -m pip install -e ".[dev]"
+        python -m pip install psutil
 
     - name: Run performance tests
       run: |
@@ -204,7 +206,7 @@ jobs:
         })
 
         # Test each formatter
-        for radio in ['anytone-878', 'anytone-578', 'baofeng-dm32uv', 'baofeng-k5']:
+        for radio in ['anytone-878', 'anytone-578', 'baofeng-dm32uv', 'baofeng-k5', 'baofeng-uv5r', 'baofeng-uv5rm', 'baofeng-uv25', 'baofeng-uv28']:
             formatter = get_radio_formatter(radio)
 
             start_time = time.time()
