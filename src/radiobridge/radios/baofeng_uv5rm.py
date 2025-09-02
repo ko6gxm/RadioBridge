@@ -2,8 +2,7 @@
 
 from typing import List, Optional
 
-import pandas as pd
-
+from ..lightweight_data import LightDataFrame
 from .base import BaseRadioFormatter
 from .metadata import RadioMetadata
 from .enhanced_metadata import (
@@ -148,10 +147,10 @@ class BaofengUV5RMFormatter(BaseRadioFormatter):
 
     def format(
         self,
-        data: pd.DataFrame,
+        data: LightDataFrame,
         start_channel: int = 1,
         cps_version: Optional[str] = None,
-    ) -> pd.DataFrame:
+    ) -> LightDataFrame:
         """Format repeater data for Baofeng UV-5RM.
 
         Args:
@@ -246,7 +245,7 @@ class BaofengUV5RMFormatter(BaseRadioFormatter):
             # Generate channel name using base class helper
             # UV-5RM has similar display to UV-5R (8 chars max)
             channel_name = self.build_channel_name(row, max_length=8, location_slice=4)
-            if not channel_name:
+            if not channel_name or channel_name == "Unknown":
                 channel_name = f"CH{channel:03d}"
 
             channel_names.append(channel_name)
@@ -320,7 +319,13 @@ class BaofengUV5RMFormatter(BaseRadioFormatter):
         for i, resolved_name in enumerate(resolved_names):
             formatted_data[i]["Name"] = resolved_name
 
-        result_df = pd.DataFrame(formatted_data)
+        # Build ordered LightDataFrame matching output_columns
+        ordered_cols = self.output_columns
+        data_dict = {col: [] for col in ordered_cols}
+        for rec in formatted_data:
+            for col in ordered_cols:
+                data_dict[col].append(rec.get(col))
+        result_df = LightDataFrame(data_dict, ordered_cols)
         self.logger.info(
             f"Format operation complete: {len(result_df)} channels formatted"
         )

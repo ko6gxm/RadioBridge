@@ -2,8 +2,7 @@
 
 from typing import List, Optional
 
-import pandas as pd
-
+from radiobridge.lightweight_data import LightDataFrame, LightSeries, is_null
 from .base import BaseRadioFormatter
 from .metadata import RadioMetadata
 from .enhanced_metadata import (
@@ -149,19 +148,21 @@ class BaofengK5PlusFormatter(BaseRadioFormatter):
 
     def format(
         self,
-        data: pd.DataFrame,
+        data: LightDataFrame,
         start_channel: int = 1,
         cps_version: Optional[str] = None,
-    ) -> pd.DataFrame:
+    ) -> LightDataFrame:
         """Format repeater data for Baofeng K5 Plus.
 
         Args:
-            data: Input DataFrame with repeater information
+            data: Input LightDataFrame with repeater information
             start_channel: Starting channel number (default: 1)
 
         Returns:
-            Formatted DataFrame ready for K5 Plus programming software
+            Formatted LightDataFrame ready for K5 Plus programming software
         """
+        # Normalize input data to handle both LightDataFrame and pandas DataFrame
+        data = self._normalize_input_data(data)
         self.validate_input(data)
 
         self.logger.info(f"Starting format operation for {len(data)} repeaters")
@@ -182,7 +183,8 @@ class BaofengK5PlusFormatter(BaseRadioFormatter):
         formatted_data = []
         channel_names = []  # Collect names for conflict resolution
 
-        for idx, row in data.iterrows():
+        for idx in range(len(data)):
+            row = data.iloc(idx)
             channel = idx + start_channel
 
             # Get RX frequency (works with both basic and detailed downloader)
@@ -265,7 +267,13 @@ class BaofengK5PlusFormatter(BaseRadioFormatter):
         for i, resolved_name in enumerate(resolved_names):
             formatted_data[i]["Channel Name"] = resolved_name
 
-        result_df = pd.DataFrame(formatted_data)
+        # Convert to LightDataFrame
+        output_data = {col: [] for col in self.output_columns}
+        for row in formatted_data:
+            for col in self.output_columns:
+                output_data[col].append(row.get(col, ""))
+        
+        result_df = self.create_output_dataframe(output_data)
         self.logger.info(
             f"Format operation complete: {len(result_df)} channels formatted"
         )

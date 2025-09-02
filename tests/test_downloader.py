@@ -3,7 +3,6 @@
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-import pandas as pd
 import pytest
 import responses
 
@@ -13,6 +12,7 @@ from radiobridge.detailed_downloader import (
     download_with_details_by_county,
     download_with_details_by_city,
 )
+from radiobridge.lightweight_data import LightDataFrame, is_null
 
 
 class TestRepeaterBookDownloader:
@@ -112,13 +112,13 @@ class TestRepeaterBookDownloader:
         df = downloader.download_by_county("CA", "Los Angeles")
 
         # Verify results
-        assert isinstance(df, pd.DataFrame)
+        assert isinstance(df, LightDataFrame)
         assert len(df) == 2
         assert "frequency" in df.columns
-        assert df.iloc[0]["frequency"] == 146.52
-        assert df.iloc[0]["callsign"] == "W6ABC"
-        assert df.iloc[1]["frequency"] == 147.0
-        assert df.iloc[1]["callsign"] == "K6XYZ"
+        assert df.iloc(0)["frequency"] == "146.520000"
+        assert df.iloc(0)["callsign"] == "W6ABC"
+        assert df.iloc(1)["frequency"] == "147.000000"
+        assert df.iloc(1)["callsign"] == "K6XYZ"
 
     @responses.activate
     def test_download_by_city_success(self):
@@ -145,11 +145,11 @@ class TestRepeaterBookDownloader:
         df = downloader.download_by_city("TX", "Austin")
 
         # Verify results
-        assert isinstance(df, pd.DataFrame)
+        assert isinstance(df, LightDataFrame)
         assert len(df) == 1
         assert "frequency" in df.columns
-        assert df.iloc[0]["frequency"] == 444.125
-        assert df.iloc[0]["callsign"] == "N5DEF"
+        assert df.iloc(0)["frequency"] == "444.125000"
+        assert df.iloc(0)["callsign"] == "N5DEF"
 
     @responses.activate
     def test_download_by_county_no_table_found(self):
@@ -176,8 +176,8 @@ class TestRepeaterBookDownloader:
         """Test data cleaning functionality."""
         downloader = RepeaterBookDownloader()
 
-        # Create test DataFrame with issues to clean
-        df = pd.DataFrame(
+        # Create test LightDataFrame with issues to clean
+        df = LightDataFrame(
             {
                 "Frequency": ["  146.520  ", "147.000"],
                 "Call Sign": ["W6ABC", "  K6XYZ  "],
@@ -193,12 +193,12 @@ class TestRepeaterBookDownloader:
         assert "callsign" in cleaned.columns
 
         # Check whitespace stripping
-        assert cleaned["frequency"].iloc[0] == "146.520"
-        assert cleaned["callsign"].iloc[1] == "K6XYZ"
+        assert cleaned["frequency"][0] == "146.520"
+        assert cleaned["callsign"][1] == "K6XYZ"
 
         # Check empty string handling
-        assert pd.isna(cleaned["tone"].iloc[0])
-        assert pd.isna(cleaned["location"].iloc[1])
+        assert is_null(cleaned["tone"][0])
+        assert is_null(cleaned["location"][1])
 
 
 class TestConvenienceFunctions:
@@ -208,7 +208,7 @@ class TestConvenienceFunctions:
     def test_download_with_details_by_county(self, mock_downloader_class):
         """Test county download convenience function."""
         mock_downloader = Mock()
-        mock_downloader.download_with_details.return_value = pd.DataFrame(
+        mock_downloader.download_with_details.return_value = LightDataFrame(
             {"test": [1, 2, 3]}
         )
         mock_downloader_class.return_value = mock_downloader
@@ -234,13 +234,13 @@ class TestConvenienceFunctions:
             country="United States",
             bands=["all"],
         )
-        assert isinstance(result, pd.DataFrame)
+        assert isinstance(result, LightDataFrame)
 
     @patch("radiobridge.detailed_downloader.DetailedRepeaterDownloader")
     def test_download_with_details_by_city(self, mock_downloader_class):
         """Test city download convenience function."""
         mock_downloader = Mock()
-        mock_downloader.download_with_details.return_value = pd.DataFrame(
+        mock_downloader.download_with_details.return_value = LightDataFrame(
             {"test": [1, 2, 3]}
         )
         mock_downloader_class.return_value = mock_downloader
@@ -266,13 +266,13 @@ class TestConvenienceFunctions:
             country="United States",
             bands=["all"],
         )
-        assert isinstance(result, pd.DataFrame)
+        assert isinstance(result, LightDataFrame)
 
     @patch("radiobridge.detailed_downloader.DetailedRepeaterDownloader")
     def test_original_download_function_still_works(self, mock_downloader_class):
         """Test that original download function is unchanged."""
         mock_downloader = Mock()
-        mock_downloader.download_with_details.return_value = pd.DataFrame(
+        mock_downloader.download_with_details.return_value = LightDataFrame(
             {"test": [1, 2, 3]}
         )
         mock_downloader_class.return_value = mock_downloader
@@ -293,14 +293,14 @@ class TestConvenienceFunctions:
         mock_downloader.download_with_details.assert_called_once_with(
             level="state", state="CA", country="United States", bands=["all"]
         )
-        assert isinstance(result, pd.DataFrame)
+        assert isinstance(result, LightDataFrame)
 
     def test_clean_scraped_data_splits_tone_up_down_column(self):
         """Test that 'Tone Up / Down' column is properly split into separate columns."""
         downloader = RepeaterBookDownloader()
 
         # Test data with various tone formats
-        test_data = pd.DataFrame(
+        test_data = LightDataFrame(
             {
                 "Frequency": ["146.520", "147.000", "440.125", "146.640", "147.180"],
                 "Tone Up / Down": [
@@ -324,29 +324,29 @@ class TestConvenienceFunctions:
         )  # Original column should be removed
 
         # Check specific values
-        assert result.iloc[0]["tone_up"] == "123.0"
-        assert result.iloc[0]["tone_down"] == "456.0"
+        assert result.iloc(0)["tone_up"] == "123.0"
+        assert result.iloc(0)["tone_down"] == "456.0"
 
-        assert result.iloc[1]["tone_up"] == "67.0"
-        assert result.iloc[1]["tone_down"] == "88.5"
+        assert result.iloc(1)["tone_up"] == "67.0"
+        assert result.iloc(1)["tone_down"] == "88.5"
 
-        assert result.iloc[2]["tone_up"] == "100.0"
-        assert result.iloc[2]["tone_down"] == "200.0"
+        assert result.iloc(2)["tone_up"] == "100.0"
+        assert result.iloc(2)["tone_down"] == "200.0"
 
-        assert result.iloc[3]["tone_up"] == "150.0"
+        assert result.iloc(3)["tone_up"] == "150.0"
         assert (
-            result.iloc[3]["tone_down"] is None
+            result.iloc(3)["tone_down"] is None
         )  # Single value leaves tone_down empty
 
-        assert result.iloc[4]["tone_up"] is None  # Empty string becomes None
-        assert result.iloc[4]["tone_down"] is None
+        assert result.iloc(4)["tone_up"] is None  # Empty string becomes None
+        assert result.iloc(4)["tone_down"] is None
 
     def test_clean_scraped_data_handles_missing_tone_column(self):
         """Test that data without 'Tone Up / Down' column is processed normally."""
         downloader = RepeaterBookDownloader()
 
         # Test data without tone up/down column
-        test_data = pd.DataFrame(
+        test_data = LightDataFrame(
             {
                 "Frequency": ["146.520", "147.000"],
                 "Call Sign": ["W1ABC", "K2DEF"],

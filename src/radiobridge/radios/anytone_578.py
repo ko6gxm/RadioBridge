@@ -2,8 +2,7 @@
 
 from typing import List, Optional
 
-import pandas as pd
-
+from ..lightweight_data import LightDataFrame
 from .base import BaseRadioFormatter
 from .metadata import RadioMetadata
 from .enhanced_metadata import (
@@ -138,10 +137,10 @@ class Anytone578Formatter(BaseRadioFormatter):
 
     def format(
         self,
-        data: pd.DataFrame,
+        data: LightDataFrame,
         start_channel: int = 1,
         cps_version: Optional[str] = None,
-    ) -> pd.DataFrame:
+    ) -> LightDataFrame:
         """Format repeater data for Anytone 578.
 
         Args:
@@ -151,6 +150,8 @@ class Anytone578Formatter(BaseRadioFormatter):
         Returns:
             Formatted DataFrame ready for Anytone CPS import
         """
+        # Normalize input data to handle both LightDataFrame and pandas DataFrame
+        data = self._normalize_input_data(data)
         self.validate_input(data)
 
         self.logger.info(f"Starting format operation for {len(data)} repeaters")
@@ -246,7 +247,7 @@ class Anytone578Formatter(BaseRadioFormatter):
         for i, resolved_name in enumerate(resolved_names):
             formatted_data[i]["Channel Name"] = resolved_name
 
-        result_df = pd.DataFrame(formatted_data)
+        result_df = LightDataFrame.from_records(formatted_data)
         self.logger.info(
             f"Format operation complete: {len(result_df)} channels formatted"
         )

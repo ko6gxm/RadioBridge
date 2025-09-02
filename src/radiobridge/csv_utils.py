@@ -1,11 +1,18 @@
-"""CSV utilities for reading and writing repeater data."""
+"""Lightweight CSV utilities using only built-in Python modules.
+
+This module provides CSV operations without external dependencies
+for fast startup times and minimal resource usage.
+"""
 
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
-import pandas as pd
-
+from radiobridge.lightweight_data import LightDataFrame, LightSeries, is_null, read_csv_light, write_csv_light
 from radiobridge.logging_config import get_logger
+
+# Export the main classes for convenience
+DataFrame = LightDataFrame
+Series = LightSeries
 
 logger = get_logger(__name__)
 
@@ -15,17 +22,17 @@ def read_csv(
     encoding: str = "utf-8",
     comment: Optional[str] = None,
     **kwargs: Any,
-) -> pd.DataFrame:
-    """Read a CSV file into a pandas DataFrame.
+):
+    """Read a CSV file into a LightDataFrame.
 
     Args:
         file_path: Path to the CSV file
         encoding: File encoding (default: utf-8)
         comment: Character to use as comment delimiter (lines starting with this are ignored)
-        **kwargs: Additional arguments passed to pandas.read_csv()
+        **kwargs: Additional arguments (for compatibility with pandas interface)
 
     Returns:
-        DataFrame containing the CSV data
+        LightDataFrame containing the CSV data
 
     Raises:
         FileNotFoundError: If the file doesn't exist
@@ -34,9 +41,9 @@ def read_csv(
     logger.info(f"Reading CSV file: {file_path}")
 
     try:
-        df = pd.read_csv(file_path, encoding=encoding, comment=comment, **kwargs)
+        df = read_csv_light(file_path, encoding=encoding, comment=comment)
         logger.info(f"Successfully read CSV: {len(df)} rows, {len(df.columns)} columns")
-        logger.debug(f"CSV columns: {list(df.columns)}")
+        logger.debug(f"CSV columns: {df.columns}")
         return df
     except FileNotFoundError:
         logger.error(f"CSV file not found: {file_path}")
@@ -47,20 +54,20 @@ def read_csv(
 
 
 def write_csv(
-    data: pd.DataFrame,
+    data: LightDataFrame,
     file_path: Union[str, Path],
     encoding: str = "utf-8",
     index: bool = False,
     **kwargs: Any,
 ) -> None:
-    """Write a pandas DataFrame to a CSV file.
+    """Write a LightDataFrame to a CSV file.
 
     Args:
-        data: DataFrame to write
+        data: LightDataFrame to write
         file_path: Output file path
         encoding: File encoding (default: utf-8)
         index: Whether to write row indices (default: False)
-        **kwargs: Additional arguments passed to pandas.DataFrame.to_csv()
+        **kwargs: Additional arguments (for compatibility)
 
     Raises:
         ValueError: If data is empty or invalid
@@ -80,7 +87,7 @@ def write_csv(
 
     try:
         logger.debug(f"CSV write options: encoding={encoding}, index={index}")
-        data.to_csv(file_path, encoding=encoding, index=index, **kwargs)
+        write_csv_light(data, file_path, encoding=encoding, index=index)
         logger.info(f"Successfully wrote CSV file: {file_path}")
     except Exception as e:
         logger.error(f"Failed to write CSV file {file_path}: {e}")
@@ -88,14 +95,14 @@ def write_csv(
 
 
 def validate_csv_columns(
-    data: pd.DataFrame,
-    required_columns: list[str],
-    optional_columns: Optional[list[str]] = None,
+    data: LightDataFrame,
+    required_columns: List[str],
+    optional_columns: Optional[List[str]] = None,
 ) -> bool:
-    """Validate that a DataFrame has the required columns.
+    """Validate that a LightDataFrame has the required columns.
 
     Args:
-        data: DataFrame to validate
+        data: LightDataFrame to validate
         required_columns: List of column names that must be present
         optional_columns: List of column names that may be present
 
@@ -105,18 +112,19 @@ def validate_csv_columns(
     Raises:
         ValueError: If required columns are missing
     """
+    columns = data.columns
+
     logger.debug(
-        f"Validating columns. Required: {required_columns}, "
-        f"Present: {list(data.columns)}"
+        f"Validating columns. Required: {required_columns}, Present: {columns}"
     )
 
-    missing_columns = [col for col in required_columns if col not in data.columns]
+    missing_columns = [col for col in required_columns if col not in columns]
 
     if missing_columns:
         logger.error(f"Missing required columns: {missing_columns}")
         raise ValueError(
             f"Missing required columns: {missing_columns}. "
-            f"Available columns: {list(data.columns)}"
+            f"Available columns: {columns}"
         )
 
     logger.info(
@@ -126,14 +134,14 @@ def validate_csv_columns(
     return True
 
 
-def clean_csv_data(data: pd.DataFrame) -> pd.DataFrame:
+def clean_csv_data(data: LightDataFrame) -> LightDataFrame:
     """Clean and normalize CSV data.
 
     Args:
-        data: Raw DataFrame to clean
+        data: Raw LightDataFrame to clean
 
     Returns:
-        Cleaned DataFrame
+        Cleaned LightDataFrame
     """
     logger.debug(
         f"Starting CSV data cleaning: {len(data)} rows, {len(data.columns)} columns"
@@ -143,21 +151,20 @@ def clean_csv_data(data: pd.DataFrame) -> pd.DataFrame:
     cleaned = data.copy()
 
     # Strip whitespace from string columns
-    string_columns = cleaned.select_dtypes(include=["object"]).columns
-    logger.debug(
-        f"Cleaning {len(string_columns)} string columns: {list(string_columns)}"
-    )
+    cleaned.strip_strings()
+    logger.debug(f"Stripped whitespace from string columns")
 
-    cleaned[string_columns] = cleaned[string_columns].apply(
-        lambda x: x.str.strip() if hasattr(x, "str") else x
-    )
-
-    # Replace empty strings with NaN for consistency
-    empty_count = (cleaned == "").sum().sum()
-    cleaned = cleaned.replace("", pd.NA)
+    # Replace empty strings with None for consistency
+    cleaned.replace_empty_strings(None)
+    
+    # Count replacements for logging
+    empty_count = 0
+    for col in cleaned.columns:
+        if col in cleaned._data:
+            empty_count += sum(1 for value in cleaned._data[col] if is_null(value))
 
     if empty_count > 0:
-        logger.debug(f"Replaced {empty_count} empty strings with NaN")
+        logger.debug(f"Handled {empty_count} empty/null values")
 
     logger.debug("CSV data cleaning complete")
     return cleaned
@@ -207,7 +214,7 @@ def read_csv_comments(
 
 
 def write_csv_with_comments(
-    data: pd.DataFrame,
+    data: LightDataFrame,
     file_path: Union[str, Path],
     comments: Optional[Dict[str, str]] = None,
     encoding: str = "utf-8",
@@ -215,16 +222,16 @@ def write_csv_with_comments(
     comment_char: str = "#",
     **kwargs: Any,
 ) -> None:
-    """Write a pandas DataFrame to a CSV file with comment header.
+    """Write a LightDataFrame to a CSV file with comment header.
 
     Args:
-        data: DataFrame to write
+        data: LightDataFrame to write
         file_path: Output file path
         comments: Dictionary of comment metadata to write at the top
         encoding: File encoding (default: utf-8)
         index: Whether to write row indices (default: False)
         comment_char: Character to use for comments (default: '#')
-        **kwargs: Additional arguments passed to pandas.DataFrame.to_csv()
+        **kwargs: Additional arguments (for compatibility)
 
     Raises:
         ValueError: If data is empty or invalid
@@ -253,8 +260,19 @@ def write_csv_with_comments(
                     f.write(f"{comment_char} {readable_key}: {value}\n")
                 f.write(f"{comment_char}\n")  # Blank comment line for separation
 
-            # Write the CSV data
-            data.to_csv(f, encoding=None, index=index, **kwargs)
+            # Write the CSV data using csv module
+            import csv
+            writer = csv.DictWriter(f, fieldnames=data.columns)
+            writer.writeheader()
+            
+            # Write rows
+            for i in range(len(data)):
+                row_dict = {}
+                for col in data.columns:
+                    value = data._data.get(col, [None] * len(data))[i]
+                    # Convert None to empty string for CSV
+                    row_dict[col] = "" if value is None else str(value)
+                writer.writerow(row_dict)
 
         logger.info(f"Successfully wrote CSV file with comments: {file_path}")
     except Exception as e:

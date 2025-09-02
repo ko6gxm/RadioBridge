@@ -1,9 +1,9 @@
 """Formatter for Baofeng DM-32UV handheld radio."""
 
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
+from ..lightweight_data import LightSeries, is_null
 
-import pandas as pd
-
+from ..lightweight_data import LightDataFrame
 from .base import BaseRadioFormatter
 from .metadata import RadioMetadata
 from .enhanced_metadata import (
@@ -159,10 +159,10 @@ class BaofengDM32UVFormatter(BaseRadioFormatter):
 
     def format(
         self,
-        data: pd.DataFrame,
+        data: LightDataFrame,
         start_channel: int = 1,
         cps_version: Optional[str] = None,
-    ) -> pd.DataFrame:
+    ) -> LightDataFrame:
         """Format repeater data for Baofeng DM-32UV.
 
         Args:
@@ -172,6 +172,8 @@ class BaofengDM32UVFormatter(BaseRadioFormatter):
         Returns:
             Formatted DataFrame ready for DM-32UV programming software
         """
+        # Normalize input data to handle both LightDataFrame and pandas DataFrame
+        data = self._normalize_input_data(data)
         self.validate_input(data)
 
         self.logger.info(f"Starting format operation for {len(data)} repeaters")
@@ -293,7 +295,7 @@ class BaofengDM32UVFormatter(BaseRadioFormatter):
         for i, resolved_name in enumerate(resolved_names):
             formatted_data[i]["Channel Name"] = resolved_name
 
-        result_df = pd.DataFrame(formatted_data)
+        result_df = LightDataFrame.from_records(formatted_data)
         self.logger.info(
             f"Format operation complete: {len(result_df)} channels formatted"
         )
@@ -301,12 +303,12 @@ class BaofengDM32UVFormatter(BaseRadioFormatter):
 
     def format_zones(
         self,
-        formatted_data: pd.DataFrame,
+        formatted_data: LightDataFrame,
         csv_metadata: Optional[Dict[str, str]] = None,
         zone_strategy: str = "location",
         max_zones: int = 250,
         max_channels_per_zone: int = 64,
-    ) -> pd.DataFrame:
+    ) -> LightDataFrame:
         """Format zone data for Baofeng DM-32UV.
 
         Creates zones in the format: No., Zone Name, Channel Members
@@ -439,13 +441,13 @@ class BaofengDM32UVFormatter(BaseRadioFormatter):
             # Fallback: create default zone
             zones_data.append({"No.": 1, "Zone Name": "Default", "Channel Members": ""})
 
-        result_df = pd.DataFrame(zones_data)
+        result_df = LightDataFrame.from_records(zones_data)
         self.logger.info(
             f"Created {len(result_df)} zones using {zone_strategy} strategy"
         )
         return result_df
 
-    def _get_rx_frequency(self, row: pd.Series) -> Optional[str]:
+    def _get_rx_frequency(self, row: LightSeries) -> Optional[str]:
         """Get RX frequency from row data, handling both basic and detailed formats.
 
         Args:
@@ -457,7 +459,7 @@ class BaofengDM32UVFormatter(BaseRadioFormatter):
         # Try detailed downloader format first: Downlink -> RX Frequency[MHz]
         if (
             "Downlink" in row
-            and pd.notna(row["Downlink"])
+            and not is_null(row["Downlink"])
             and str(row["Downlink"]).strip()
         ):
             return self.clean_frequency(row["Downlink"])
@@ -465,19 +467,19 @@ class BaofengDM32UVFormatter(BaseRadioFormatter):
         # Try basic downloader format: frequency -> RX Frequency[MHz]
         if (
             "frequency" in row
-            and pd.notna(row["frequency"])
+            and not is_null(row["frequency"])
             and str(row["frequency"]).strip()
         ):
             return self.clean_frequency(row["frequency"])
 
         # Try alternative column names
         for col in ["rx_freq", "receive_frequency", "downlink_freq"]:
-            if col in row and pd.notna(row[col]) and str(row[col]).strip():
+            if col in row and not is_null(row[col]) and str(row[col]).strip():
                 return self.clean_frequency(row[col])
 
         return None
 
-    def _get_tx_frequency(self, row: pd.Series, rx_freq: str) -> str:
+    def _get_tx_frequency(self, row: LightSeries, rx_freq: str) -> str:
         """Get TX frequency from row data, handling both basic and detailed formats.
 
         Args:
@@ -488,23 +490,23 @@ class BaofengDM32UVFormatter(BaseRadioFormatter):
             TX frequency string
         """
         # Try detailed downloader format first: Uplink -> TX Frequency[MHz]
-        if "Uplink" in row and pd.notna(row["Uplink"]) and str(row["Uplink"]).strip():
+        if "Uplink" in row and not is_null(row["Uplink"]) and str(row["Uplink"]).strip():
             tx_freq = self.clean_frequency(row["Uplink"])
             if tx_freq:
                 return tx_freq
 
         # Try direct TX frequency fields
         for col in ["tx_freq", "transmit_frequency", "uplink_freq"]:
-            if col in row and pd.notna(row[col]) and str(row[col]).strip():
+            if col in row and not is_null(row[col]) and str(row[col]).strip():
                 tx_freq = self.clean_frequency(row[col])
                 if tx_freq:
                     return tx_freq
 
         # Calculate from offset (basic downloader format or detailed format with Offset)
         offset = None
-        if "Offset" in row and pd.notna(row["Offset"]) and str(row["Offset"]).strip():
+        if "Offset" in row and not is_null(row["Offset"]) and str(row["Offset"]).strip():
             offset = self.clean_offset(row["Offset"])
-        elif "offset" in row and pd.notna(row["offset"]) and str(row["offset"]).strip():
+        elif "offset" in row and not is_null(row["offset"]) and str(row["offset"]).strip():
             offset = self.clean_offset(row["offset"])
 
         if offset and offset != "0.000000":
@@ -518,7 +520,7 @@ class BaofengDM32UVFormatter(BaseRadioFormatter):
         # Fallback: same as RX frequency (simplex)
         return rx_freq
 
-    def _get_tone_values(self, row: pd.Series) -> tuple[Optional[str], Optional[str]]:
+    def _get_tone_values(self, row: LightSeries) -> Tuple[Optional[str], Optional[str]]:
         """Get tone values from row data, handling both basic and detailed formats.
 
         Args:
@@ -534,13 +536,13 @@ class BaofengDM32UVFormatter(BaseRadioFormatter):
         # Uplink Tone -> encode (TX tone)
         if (
             "Uplink Tone" in row
-            and pd.notna(row["Uplink Tone"])
+            and not is_null(row["Uplink Tone"])
             and str(row["Uplink Tone"]).strip()
         ):
             tone_up = self.clean_tone(row["Uplink Tone"])
         elif (
             "tone_up" in row
-            and pd.notna(row["tone_up"])
+            and not is_null(row["tone_up"])
             and str(row["tone_up"]).strip()
         ):
             tone_up = self.clean_tone(row["tone_up"])
@@ -548,27 +550,27 @@ class BaofengDM32UVFormatter(BaseRadioFormatter):
         # Downlink Tone -> decode (RX tone)
         if (
             "Downlink Tone" in row
-            and pd.notna(row["Downlink Tone"])
+            and not is_null(row["Downlink Tone"])
             and str(row["Downlink Tone"]).strip()
         ):
             tone_down = self.clean_tone(row["Downlink Tone"])
         elif (
             "tone_down" in row
-            and pd.notna(row["tone_down"])
+            and not is_null(row["tone_down"])
             and str(row["tone_down"]).strip()
         ):
             tone_down = self.clean_tone(row["tone_down"])
 
         # Fallback to legacy single tone field (use for both encode and decode)
         if not tone_up and not tone_down:
-            if "tone" in row and pd.notna(row["tone"]) and str(row["tone"]).strip():
+            if "tone" in row and not is_null(row["tone"]) and str(row["tone"]).strip():
                 legacy_tone = self.clean_tone(row["tone"])
                 if legacy_tone:
                     tone_up = tone_down = legacy_tone
 
         return tone_up, tone_down
 
-    def _is_dmr_repeater(self, row: pd.Series) -> bool:
+    def _is_dmr_repeater(self, row: LightSeries) -> bool:
         """Determine if this is a DMR repeater from row data.
 
         Args:
@@ -578,12 +580,12 @@ class BaofengDM32UVFormatter(BaseRadioFormatter):
             True if this appears to be a DMR repeater
         """
         # Check detailed downloader DMR field first
-        if "DMR" in row and pd.notna(row["DMR"]):
+        if "DMR" in row and not is_null(row["DMR"]):
             dmr_value = str(row["DMR"]).lower().strip()
             return dmr_value in ["true", "1", "yes", "on"]
 
         # Check for Color Code (DMR indicator)
-        if "Color Code" in row and pd.notna(row["Color Code"]):
+        if "Color Code" in row and not is_null(row["Color Code"]):
             try:
                 color_code = int(str(row["Color Code"]).strip())
                 return 0 <= color_code <= 15
@@ -591,13 +593,13 @@ class BaofengDM32UVFormatter(BaseRadioFormatter):
                 pass
 
         # Check for DMR ID
-        if "DMR ID" in row and pd.notna(row["DMR ID"]):
+        if "DMR ID" in row and not is_null(row["DMR ID"]):
             dmr_id = str(row["DMR ID"]).strip()
             return dmr_id.isdigit() and len(dmr_id) >= 3
 
         # Check legacy fields for DMR indicators
         for field in ["mode", "type", "service"]:
-            if field in row and pd.notna(row[field]):
+            if field in row and not is_null(row[field]):
                 field_value = str(row[field]).lower()
                 if any(
                     keyword in field_value for keyword in ["dmr", "digital", "mototrbo"]
@@ -606,7 +608,7 @@ class BaofengDM32UVFormatter(BaseRadioFormatter):
 
         return False
 
-    def _get_color_code(self, row: pd.Series, is_dmr: bool) -> str:
+    def _get_color_code(self, row: LightSeries, is_dmr: bool) -> str:
         """Get DMR color code from row data.
 
         Args:
@@ -620,7 +622,7 @@ class BaofengDM32UVFormatter(BaseRadioFormatter):
             return "0"
 
         # Try detailed downloader Color Code field
-        if "Color Code" in row and pd.notna(row["Color Code"]):
+        if "Color Code" in row and not is_null(row["Color Code"]):
             try:
                 color_code = int(str(row["Color Code"]).strip())
                 if 0 <= color_code <= 15:
@@ -630,7 +632,7 @@ class BaofengDM32UVFormatter(BaseRadioFormatter):
 
         # Try alternative field names
         for col in ["color_code", "cc", "dmr_color_code"]:
-            if col in row and pd.notna(row[col]):
+            if col in row and not is_null(row[col]):
                 try:
                     color_code = int(str(row[col]).strip())
                     if 0 <= color_code <= 15:
@@ -641,7 +643,7 @@ class BaofengDM32UVFormatter(BaseRadioFormatter):
         # Default color code for DMR
         return "1"
 
-    def _get_dmr_id(self, row: pd.Series) -> str:
+    def _get_dmr_id(self, row: LightSeries) -> str:
         """Get DMR ID from row data.
 
         Args:
@@ -651,21 +653,22 @@ class BaofengDM32UVFormatter(BaseRadioFormatter):
             DMR ID string or 'None'
         """
         # Try detailed downloader DMR ID field
-        if "DMR ID" in row and pd.notna(row["DMR ID"]):
+        if "DMR ID" in row and not is_null(row["DMR ID"]):
             dmr_id = str(row["DMR ID"]).strip()
             if dmr_id.isdigit() and len(dmr_id) >= 3:
                 return dmr_id
 
         # Try alternative field names
         for col in ["dmr_id", "radio_id", "id"]:
-            if col in row and pd.notna(row[col]):
+            if col in row and not is_null(row[col]):
                 dmr_id = str(row[col]).strip()
                 if dmr_id.isdigit() and len(dmr_id) >= 3:
                     return dmr_id
 
         # Try to use callsign as fallback (not ideal but sometimes used)
-        callsign = self.get_callsign(row)
-        if callsign and callsign != "None":
-            return callsign
+        # Get callsign from row data
+        callsign = row.get('callsign') or row.get('Callsign')
+        if callsign and str(callsign).strip() != "":
+            return str(callsign).strip()
 
         return "None"

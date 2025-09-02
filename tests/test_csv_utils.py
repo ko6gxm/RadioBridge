@@ -3,7 +3,6 @@
 import tempfile
 from pathlib import Path
 
-import pandas as pd
 import pytest
 
 from radiobridge.csv_utils import (
@@ -12,6 +11,7 @@ from radiobridge.csv_utils import (
     validate_csv_columns,
     write_csv,
 )
+from radiobridge.lightweight_data import LightDataFrame, is_null
 
 
 class TestReadWriteCSV:
@@ -19,7 +19,7 @@ class TestReadWriteCSV:
 
     def test_write_and_read_csv(self):
         """Test basic CSV write and read operations."""
-        data = pd.DataFrame(
+        data = LightDataFrame(
             {
                 "frequency": ["146.520000", "147.000000"],
                 "offset": ["+0.600000", "-0.600000"],
@@ -39,18 +39,22 @@ class TestReadWriteCSV:
             result = read_csv(tmp_path, dtype=str)  # Read as strings to match input
 
             # Compare
-            pd.testing.assert_frame_equal(data, result)
+            assert isinstance(result, LightDataFrame)
+            assert len(result) == len(data)
+            assert result.columns == data.columns
+            for col in data.columns:
+                assert result[col] == data[col]
 
         finally:
             tmp_path.unlink()
 
     def test_write_empty_dataframe_raises_error(self):
-        """Test that writing empty DataFrame raises ValueError."""
-        empty_data = pd.DataFrame()
+        """Test that writing empty LightDataFrame raises ValueError."""
+        empty_data = LightDataFrame()
 
         with tempfile.NamedTemporaryFile(suffix=".csv") as tmp:
             tmp_path = Path(tmp.name)
-            with pytest.raises(ValueError, match="Cannot write empty DataFrame"):
+            with pytest.raises(ValueError, match="Cannot write empty"):
                 write_csv(empty_data, tmp_path)
 
     def test_read_nonexistent_file_raises_error(self):
@@ -64,7 +68,7 @@ class TestValidateCSVColumns:
 
     def test_validate_required_columns_present(self):
         """Test validation passes when required columns are present."""
-        data = pd.DataFrame(
+        data = LightDataFrame(
             {"frequency": ["146.520"], "tone": ["123.0"], "extra": ["value"]}
         )
 
@@ -73,7 +77,7 @@ class TestValidateCSVColumns:
 
     def test_validate_missing_required_columns_raises_error(self):
         """Test validation fails when required columns are missing."""
-        data = pd.DataFrame({"frequency": ["146.520"], "extra": ["value"]})
+        data = LightDataFrame({"frequency": ["146.520"], "extra": ["value"]})
 
         required = ["frequency", "tone", "offset"]
         with pytest.raises(ValueError, match="Missing required columns"):
@@ -85,7 +89,7 @@ class TestCleanCSVData:
 
     def test_clean_csv_data_strips_whitespace(self):
         """Test that cleaning strips whitespace from string columns."""
-        data = pd.DataFrame(
+        data = LightDataFrame(
             {
                 "frequency": ["  146.520  ", "147.000"],
                 "location": ["  Test Location  ", "Another  "],
@@ -95,17 +99,17 @@ class TestCleanCSVData:
 
         cleaned = clean_csv_data(data)
 
-        assert cleaned["frequency"].iloc[0] == "146.520"
-        assert cleaned["location"].iloc[0] == "Test Location"
-        assert cleaned["location"].iloc[1] == "Another"
-        assert cleaned["numeric"].iloc[0] == 1  # Numeric unchanged
+        assert cleaned["frequency"][0] == "146.520"
+        assert cleaned["location"][0] == "Test Location"
+        assert cleaned["location"][1] == "Another"
+        assert cleaned["numeric"][0] == 1  # Numeric unchanged
 
     def test_clean_csv_data_replaces_empty_strings(self):
-        """Test that empty strings are replaced with NaN."""
-        data = pd.DataFrame({"frequency": ["146.520", ""], "tone": ["", "123.0"]})
+        """Test that empty strings are replaced with None."""
+        data = LightDataFrame({"frequency": ["146.520", ""], "tone": ["", "123.0"]})
 
         cleaned = clean_csv_data(data)
 
-        assert pd.isna(cleaned["frequency"].iloc[1])
-        assert pd.isna(cleaned["tone"].iloc[0])
-        assert cleaned["tone"].iloc[1] == "123.0"
+        assert is_null(cleaned["frequency"][1])
+        assert is_null(cleaned["tone"][0])
+        assert cleaned["tone"][1] == "123.0"

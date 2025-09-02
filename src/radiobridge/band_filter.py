@@ -6,6 +6,7 @@ by amateur radio bands (2m, 70cm, etc.).
 
 from typing import Dict, List, Tuple
 
+from radiobridge.lightweight_data import LightDataFrame
 from radiobridge.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -108,18 +109,16 @@ def get_repeaterbook_band_param(bands: List[str]) -> str:
     return param
 
 
-def filter_by_frequency(data, bands: List[str]):
-    """Filter DataFrame by frequency ranges for specified bands.
+def filter_by_frequency(data: LightDataFrame, bands: List[str]) -> LightDataFrame:
+    """Filter LightDataFrame by frequency ranges for specified bands.
 
     Args:
-        data: DataFrame with 'frequency' column
+        data: LightDataFrame with 'frequency' column
         bands: List of band names to include
 
     Returns:
-        Filtered DataFrame containing only specified bands
+        Filtered LightDataFrame containing only specified bands
     """
-    import pandas as pd
-
     if "all" in bands:
         logger.debug("Band filter set to 'all', returning all data")
         return data
@@ -130,29 +129,63 @@ def filter_by_frequency(data, bands: List[str]):
 
     logger.debug(f"Filtering {len(data)} rows by bands: {bands}")
 
-    # Create frequency mask
-    mask = pd.Series([False] * len(data), index=data.index)
-
+    # Get frequency column data
+    frequency_data = data["frequency"]
+    
+    # Track which rows match any band
+    matching_rows = []
+    total_matches_per_band = {}
+    
+    for i in range(len(data)):
+        freq_value = frequency_data[i]
+        row_matches = False
+        
+        # Try to convert frequency to float
+        try:
+            if freq_value is None or str(freq_value).strip() == "":
+                continue
+            freq_float = float(str(freq_value).strip())
+        except (ValueError, TypeError):
+            continue
+            
+        # Check each band
+        for band in bands:
+            if band in AMATEUR_BANDS:
+                freq_min, freq_max = AMATEUR_BANDS[band]
+                
+                if freq_min <= freq_float <= freq_max:
+                    row_matches = True
+                    if band not in total_matches_per_band:
+                        total_matches_per_band[band] = 0
+                    total_matches_per_band[band] += 1
+        
+        if row_matches:
+            matching_rows.append(i)
+    
+    # Log band matches
     for band in bands:
         if band in AMATEUR_BANDS:
             freq_min, freq_max = AMATEUR_BANDS[band]
-
-            # Convert frequency column to numeric, handling various formats
-            freq_numeric = pd.to_numeric(data["frequency"], errors="coerce")
-
-            # Create mask for this band
-            band_mask = (freq_numeric >= freq_min) & (freq_numeric <= freq_max)
-            mask = mask | band_mask
-
-            matches = band_mask.sum()
+            matches = total_matches_per_band.get(band, 0)
             logger.debug(f"Band {band} ({freq_min}-{freq_max} MHz): {matches} matches")
-
-    filtered_data = data[mask].copy()
+    
+    # Create filtered data by extracting matching rows
+    if not matching_rows:
+        filtered_data = LightDataFrame()
+    else:
+        # Extract matching rows
+        filtered_records = []
+        for row_idx in matching_rows:
+            row = data.iloc(row_idx)
+            filtered_records.append(row.to_dict())
+        
+        filtered_data = LightDataFrame.from_records(filtered_records)
+    
     logger.info(
         f"Band filtering complete: {len(filtered_data)} of {len(data)} rows "
         f"match bands {bands}"
     )
-
+    
     return filtered_data
 
 
