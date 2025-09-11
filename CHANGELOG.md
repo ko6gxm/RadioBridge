@@ -46,6 +46,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2025-09-11
+
+### Added
+- Anytone 878 UVII full-field formatter (exact CPS column order)
+- Baofeng DM-32UV full-field formatter (exact CPS column order)
+- Schema adapter to normalize API/scrape data at format time
+
+### Fixed
+- RepeaterBook API 400 errors by using state_id and mapping band params; API column normalization for client-side filtering
+
+### Docs
+- Removed pandas references; added examples for new full-field formatters
+
 ### Fixed
 - 🛠️ RepeaterBook JSON API 400 errors when using API source
   - Use `state_id` (numeric) instead of two-letter `state` when calling `https://www.repeaterbook.com/api/export.php`
