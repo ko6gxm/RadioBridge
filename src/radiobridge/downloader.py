@@ -1,10 +1,19 @@
 """Download repeater data from RepeaterBook.com."""
 
+class DownloaderError(Exception):
+    """Base class for downloader errors."""
+
+
+class ParseError(DownloaderError, ValueError):
+    """Raised when parsing downloaded content fails."""
+
 import tempfile
 from typing import Dict, List, Optional, Any
 from io import StringIO
 
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 from bs4 import BeautifulSoup
 
 from radiobridge.band_filter import (
@@ -21,19 +30,38 @@ class RepeaterBookDownloader:
 
     BASE_URL = "https://www.repeaterbook.com"
 
-    def __init__(self, timeout: int = 30):
+    def __init__(self, timeout: int = 30, retries: int = 3, backoff_factor: float = 0.0):
         """Initialize the downloader.
 
         Args:
             timeout: Request timeout in seconds
+            retries: Number of retry attempts for transient failures
+            backoff_factor: Exponential backoff factor between retries
         """
         self.timeout = timeout
         self.session = requests.Session()
+        # Configure a retry-enabled HTTP adapter for resilience
+        retries_cfg = Retry(
+            total=retries,
+            connect=retries,
+            read=retries,
+            status=retries,
+            backoff_factor=backoff_factor,
+            status_forcelist=[429, 500, 502, 503, 504],
+            allowed_methods=frozenset(["GET", "HEAD", "OPTIONS"]),
+        )
+        adapter = HTTPAdapter(max_retries=retries_cfg)
+        self.session.mount("https://", adapter)
+        self.session.mount("http://", adapter)
         self.session.headers.update(
             {"User-Agent": "radiobridge/0.2.0 (Amateur Radio Tool)"}
         )
         self.logger = get_logger(__name__)
-        self.logger.debug(f"RepeaterBookDownloader initialized with timeout={timeout}s")
+        self.logger.debug(
+            f"RepeaterBookDownloader initialized with timeout={timeout}s, retries={retries}, backoff_factor={backoff_factor}"
+        )
+        # Base last-request timestamp for optional rate limiting in subclasses
+        self._last_request_time = 0
 
     def download_by_state(
         self,
@@ -124,7 +152,7 @@ class RepeaterBookDownloader:
         self.logger.debug(f"Download parameters: {params}")
 
         # First, try to get CSV export if available
-        csv_data = self._try_csv_export(params)
+        csv_data = self._try_csv_export(params, kwargs.get("country", "United States"))
         if csv_data is not None:
             self.logger.info(
                 f"Successfully downloaded data via CSV export ({len(csv_data)} rows)"
@@ -245,11 +273,136 @@ class RepeaterBookDownloader:
         self.logger.debug(f"Mapped state code '{state_code}' to ID '{state_id}'")
         return state_id
 
-    def _try_csv_export(self, params: Dict[str, Any]) -> Optional[LightDataFrame]:
+    def _apply_rate_limit_base(self) -> None:
+        """Base no-op rate limiter (subclasses may override _apply_rate_limit)."""
+        # Default: no sleeping; subclasses can define _apply_rate_limit
+        return
+
+    def _get(self, url: str, **kwargs) -> requests.Response:
+        """Centralized GET with optional rate limiting and retries.
+
+        Subclasses can provide _apply_rate_limit(); otherwise, base is no-op.
+        """
+        # If subclass has its own rate limit method, use it; else base no-op
+        try:
+            rl = getattr(self, "_apply_rate_limit")
+        except AttributeError:
+            rl = None
+        if callable(rl):
+            rl()
+        else:
+            self._apply_rate_limit_base()
+        params = kwargs.get("params")
+        timeout = kwargs.get("timeout")
+        self.logger.debug(
+            f"HTTP GET {url}", extra={"params": params, "timeout": timeout}
+        )
+        import time
+        start = time.time()
+        resp = self.session.get(url, **kwargs)
+        elapsed = time.time() - start
+        self.logger.debug(
+            "HTTP GET completed",
+            extra={
+                "url": url,
+                "status": getattr(resp, "status_code", None),
+                "content_type": resp.headers.get("content-type") if hasattr(resp, "headers") else None,
+                "elapsed_s": f"{elapsed:.3f}",
+            },
+        )
+        return resp
+
+    def _select_repeater_table(self, soup: BeautifulSoup):
+        """Select the most likely repeater data table by header validation.
+
+        Preference order:
+        1) table.w3-table or #repeaters with best header match
+        2) any table with best header match
+        Returns None if no reasonable match found.
+        """
+        expected_headers = {
+            "frequency",
+            "offset",
+            "tone",
+            "call",
+            "call sign",
+            "callsign",
+            "location",
+            "city",
+            "county",
+            "state",
+            "use",
+            "operational status",
+        }
+
+        def header_score(table) -> int:
+            tr = table.find("tr")
+            if not tr:
+                return 0
+            headers = [th.get_text(strip=True).lower() for th in tr.find_all(["th", "td"]) ]
+            score = 0
+            for h in headers:
+                for token in expected_headers:
+                    if token in h:
+                        score += 1
+            return score
+
+        candidates = []
+        # Preferred selectors
+        preferred = []
+        t1 = soup.find("table", class_="w3-table")
+        if t1:
+            preferred.append(t1)
+        t2 = soup.find("table", id="repeaters")
+        if t2 and t2 not in preferred:
+            preferred.append(t2)
+        preferred = [t for t in preferred if t]
+        if preferred:
+            scored = [(header_score(t), t) for t in preferred]
+            scored.sort(key=lambda x: x[0], reverse=True)
+            if scored[0][0] >= 2:
+                return scored[0][1]
+            # Fall through to broader search
+
+        # All tables
+        all_tables = soup.find_all("table")
+        if not all_tables:
+            return None
+        scored_all = [(header_score(t), t) for t in all_tables]
+        scored_all.sort(key=lambda x: x[0], reverse=True)
+        if scored_all[0][0] >= 2:
+            return scored_all[0][1]
+        return None
+
+    def _validate_cleaned_data(self, df: LightDataFrame, params: Dict[str, Any]) -> None:
+        """Validate that cleaned data contains plausible frequency values.
+
+        Raises ParseError (subclass of ValueError) on failure to maintain
+        backward compatibility with callers/tests expecting ValueError.
+        """
+        if "frequency" not in df.columns:
+            state_id = params.get("state_id", "unknown")
+            raise ParseError(
+                f"No 'frequency' column found in repeater table for state {state_id}"
+            )
+        # Count rows with parseable float frequencies
+        valid = 0
+        freq_col = df["frequency"]
+        for v in freq_col:
+            try:
+                float(str(v))
+                valid += 1
+            except (TypeError, ValueError):
+                continue
+        if valid == 0:
+            raise ParseError("No valid frequency data found in repeater table")
+
+    def _try_csv_export(self, params: Dict[str, Any], country: str) -> Optional[LightDataFrame]:
         """Attempt to download CSV export if available.
 
         Args:
-            params: Query parameters dictionary
+            params: Query parameters dictionary (built from _build_params)
+            country: Country name from user input (e.g., 'United States')
 
         Returns:
             LightDataFrame if CSV export is available, None otherwise
@@ -260,24 +413,22 @@ class RepeaterBookDownloader:
         # Build CSV export params from search params
         csv_params = {
             "state_id": params.get("state_id", ""),
-            "country": params.get("loc", "United States"),
+            "country": country or "United States",
             "format": "csv",
         }
 
-        # Add county/city params if present
-        if "county" in params:
-            csv_params["county"] = params["county"]
-        if "city" in params:
-            csv_params["city"] = params["city"]
+        # Add county/city params if present based on 'type' and 'loc'
+        if params.get("type") == "county":
+            csv_params["county"] = params.get("loc", "")
+        elif params.get("type") == "city":
+            csv_params["city"] = params.get("loc", "")
 
         self.logger.debug(
             f"Attempting CSV export from {csv_url} with params: {csv_params}"
         )
 
         try:
-            response = self.session.get(
-                csv_url, params=csv_params, timeout=self.timeout
-            )
+            response = self._get(csv_url, params=csv_params, timeout=self.timeout)
 
             self.logger.debug(
                 f"CSV export response: {response.status_code} "
@@ -319,7 +470,7 @@ class RepeaterBookDownloader:
         self.logger.debug(f"Scraping HTML from {search_url} with params: {params}")
 
         try:
-            response = self.session.get(search_url, params=params, timeout=self.timeout)
+            response = self._get(search_url, params=params, timeout=self.timeout)
             response.raise_for_status()
 
             self.logger.debug(
@@ -334,21 +485,8 @@ class RepeaterBookDownloader:
         soup = BeautifulSoup(response.content, "html.parser")
         self.logger.debug("Parsing HTML content for repeater table")
 
-        # Find the repeater table (this selector may need adjustment)
-        table = soup.find(
-            "table", class_="w3-table"
-        )  # Common class for RepeaterBook tables
-
-        if not table:
-            self.logger.debug("w3-table class not found, trying alternative selectors")
-            # Try alternative selectors
-            table = soup.find("table", id="repeaters")
-            if not table:
-                tables = soup.find_all("table")
-                self.logger.debug(f"Found {len(tables)} tables, selecting largest")
-                if tables:
-                    # Take the largest table assuming it's the repeater data
-                    table = max(tables, key=lambda t: len(t.find_all("tr")))
+        # Select table using header validation to improve resilience
+        table = self._select_repeater_table(soup)
 
         if not table:
             # Build error message from params
@@ -361,6 +499,7 @@ class RepeaterBookDownloader:
                 location_desc = f"State {state_id}"
             else:
                 location_desc = f"Location {state_id}"
+            self.logger.error("No matching repeater table found", extra={"state_id": state_id, "params": params})
             raise ValueError(f"No repeater table found for {location_desc}")
 
         # Parse table with BeautifulSoup instead of pandas
@@ -381,11 +520,14 @@ class RepeaterBookDownloader:
             df = self._clean_scraped_data(df)
             self.logger.info(f"Data cleaning complete: {len(df)} rows after cleaning")
 
+            # Validate cleaned data has plausible frequency column
+            self._validate_cleaned_data(df, params)
+
             return df
 
         except Exception as e:
             self.logger.error(f"Table parsing failed: {e}")
-            raise ValueError(f"Failed to parse repeater table: {e}")
+            raise ParseError(f"Failed to parse repeater table: {e}")
 
     def _parse_table_with_bs4(self, table) -> List[Dict[str, Any]]:
         """Parse HTML table using BeautifulSoup instead of pandas.
@@ -582,6 +724,8 @@ def download_repeater_data(
     country: str = "United States",
     timeout: int = 30,
     bands: Optional[List[str]] = None,
+    retries: int = 3,
+    backoff_factor: float = 0.0,
 ) -> LightDataFrame:
     """Download repeater data from RepeaterBook.com.
 
@@ -601,7 +745,7 @@ def download_repeater_data(
         requests.RequestException: If download fails
         ValueError: If no data is found or parsing fails
     """
-    downloader = RepeaterBookDownloader(timeout=timeout)
+    downloader = RepeaterBookDownloader(timeout=timeout, retries=retries, backoff_factor=backoff_factor)
     return downloader.download_by_state(state, country, bands)
 
 
@@ -611,6 +755,8 @@ def download_repeater_data_by_county(
     country: str = "United States",
     timeout: int = 30,
     bands: Optional[List[str]] = None,
+    retries: int = 3,
+    backoff_factor: float = 0.0,
 ) -> LightDataFrame:
     """Download repeater data for a specific county from RepeaterBook.com.
 
@@ -631,7 +777,7 @@ def download_repeater_data_by_county(
         requests.RequestException: If download fails
         ValueError: If no data is found or parsing fails
     """
-    downloader = RepeaterBookDownloader(timeout=timeout)
+    downloader = RepeaterBookDownloader(timeout=timeout, retries=retries, backoff_factor=backoff_factor)
     return downloader.download_by_county(state, county, country, bands)
 
 
@@ -641,6 +787,8 @@ def download_repeater_data_by_city(
     country: str = "United States",
     timeout: int = 30,
     bands: Optional[List[str]] = None,
+    retries: int = 3,
+    backoff_factor: float = 0.0,
 ) -> LightDataFrame:
     """Download repeater data for a specific city from RepeaterBook.com.
 
@@ -661,5 +809,5 @@ def download_repeater_data_by_city(
         requests.RequestException: If download fails
         ValueError: If no data is found or parsing fails
     """
-    downloader = RepeaterBookDownloader(timeout=timeout)
+    downloader = RepeaterBookDownloader(timeout=timeout, retries=retries, backoff_factor=backoff_factor)
     return downloader.download_by_city(state, city, country, bands)

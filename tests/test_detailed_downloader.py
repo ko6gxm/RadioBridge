@@ -289,7 +289,13 @@ class TestDetailedDownloaderFunctions:
 
         # Verify downloader was created correctly
         mock_downloader_class.assert_called_once_with(
-            rate_limit=2.0, temp_dir=Path("/tmp"), nohammer=False, debug=False
+            rate_limit=2.0,
+            temp_dir=Path("/tmp"),
+            nohammer=False,
+            debug=False,
+            retries=3,
+            retry_backoff=0.0,
+            rate_jitter=0.0,
         )
 
         # Verify download was called correctly
@@ -312,7 +318,13 @@ class TestDetailedDownloaderFunctions:
 
         # Verify downloader was created with defaults
         mock_downloader_class.assert_called_once_with(
-            rate_limit=1.0, temp_dir=None, nohammer=False, debug=False
+            rate_limit=1.0,
+            temp_dir=None,
+            nohammer=False,
+            debug=False,
+            retries=3,
+            retry_backoff=0.0,
+            rate_jitter=0.0,
         )
 
         # Verify download was called correctly
@@ -339,7 +351,13 @@ class TestDetailedDownloaderFunctions:
 
         # Verify downloader was created with defaults
         mock_downloader_class.assert_called_once_with(
-            rate_limit=1.0, temp_dir=None, nohammer=False, debug=False
+            rate_limit=1.0,
+            temp_dir=None,
+            nohammer=False,
+            debug=False,
+            retries=3,
+            retry_backoff=0.0,
+            rate_jitter=0.0,
         )
 
         # Verify download was called correctly

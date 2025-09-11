@@ -34,6 +34,9 @@ class DetailedRepeaterDownloader(RepeaterBookDownloader):
         temp_dir: Optional[str] = None,
         nohammer: bool = False,
         debug: bool = False,
+        retries: int = 3,
+        retry_backoff: float = 0.0,
+        rate_jitter: float = 0.0,
     ):
         """Initialize the detailed downloader.
 
@@ -46,13 +49,14 @@ class DetailedRepeaterDownloader(RepeaterBookDownloader):
             debug: If True, enable debug logging to show collected data from
                 each detail page
         """
-        super().__init__(timeout)
+        super().__init__(timeout=timeout, retries=retries, backoff_factor=retry_backoff)
         self.rate_limit = rate_limit
         self.temp_dir = Path(temp_dir) if temp_dir else None
         self.nohammer = nohammer
         self.debug = debug
         self.logger = get_logger(__name__)
         self.last_request_time = 0
+        self.rate_jitter = max(0.0, rate_jitter)
 
     def download_with_details(self, level: str, **kwargs) -> LightDataFrame:
         """Download repeater data including detailed information from individual pages.
@@ -142,11 +146,9 @@ class DetailedRepeaterDownloader(RepeaterBookDownloader):
             f"Scraping with links from {search_url} with params: {params}"
         )
 
-        # Rate limiting
-        self._apply_rate_limit()
-
+        # Network request (rate limit is applied via base _get)
         try:
-            response = self.session.get(search_url, params=params, timeout=self.timeout)
+            response = self._get(search_url, params=params, timeout=self.timeout)
             response.raise_for_status()
 
             self.logger.debug(
@@ -159,13 +161,10 @@ class DetailedRepeaterDownloader(RepeaterBookDownloader):
 
         # Parse HTML with BeautifulSoup to extract both data and links
         soup = BeautifulSoup(response.content, "html.parser")
-        tables = soup.find_all("table")
-
-        if not tables:
+        # Find the main repeater table using base selector
+        main_table = self._select_repeater_table(soup)
+        if not main_table:
             raise ValueError("No tables found in response")
-
-        # Find the main repeater table
-        main_table = max(tables, key=lambda t: len(t.find_all("tr")))
 
         # Extract data using BeautifulSoup and LightDataFrame
         table_data = self._parse_table_with_bs4(main_table)
@@ -285,9 +284,6 @@ class DetailedRepeaterDownloader(RepeaterBookDownloader):
             self.logger.debug(f"Processing {i}/{total_links}: {detail_url}")
 
             try:
-                # Rate limiting
-                self._apply_rate_limit()
-
                 # Fetch and parse detail page
                 detail_data = self._scrape_detail_page(detail_url)
 
@@ -327,7 +323,7 @@ class DetailedRepeaterDownloader(RepeaterBookDownloader):
             Dictionary with detailed repeater information
         """
         try:
-            response = self.session.get(detail_url, timeout=self.timeout)
+            response = self._get(detail_url, timeout=self.timeout)
             response.raise_for_status()
 
             soup = BeautifulSoup(response.content, "html.parser")
@@ -728,10 +724,17 @@ class DetailedRepeaterDownloader(RepeaterBookDownloader):
             )
             time.sleep(sleep_time)
         else:
-            # Use fixed rate limiting
+            # Use fixed rate limiting with optional jitter
             if time_since_last < self.rate_limit:
-                sleep_time = self.rate_limit - time_since_last
-                self.logger.debug(f"Rate limiting: sleeping {sleep_time:.2f} seconds")
+                base_sleep = self.rate_limit - time_since_last
+                jitter = 0.0
+                if getattr(self, "rate_jitter", 0.0) > 0:
+                    import random
+                    jitter = random.uniform(-self.rate_jitter, self.rate_jitter)
+                sleep_time = max(0.0, base_sleep + jitter)
+                self.logger.debug(
+                    f"Rate limiting: sleeping {sleep_time:.2f} seconds (base={base_sleep:.2f}, jitter={jitter:.2f})"
+                )
                 time.sleep(sleep_time)
 
         self.last_request_time = time.time()
@@ -814,11 +817,8 @@ class DetailedRepeaterDownloader(RepeaterBookDownloader):
         status_data = {}
 
         try:
-            # Apply rate limiting for external requests
-            self._apply_rate_limit()
-
             self.logger.debug(f"Fetching IRLP status: {irlp_url}")
-            response = self.session.get(irlp_url, timeout=self.timeout)
+            response = self._get(irlp_url, timeout=self.timeout)
             response.raise_for_status()
 
             soup = BeautifulSoup(response.content, "html.parser")
@@ -1019,11 +1019,8 @@ class DetailedRepeaterDownloader(RepeaterBookDownloader):
         status_data = {}
 
         try:
-            # Apply rate limiting for external requests
-            self._apply_rate_limit()
-
             self.logger.debug(f"Fetching EchoLink status: {echolink_url}")
-            response = self.session.get(echolink_url, timeout=self.timeout)
+            response = self._get(echolink_url, timeout=self.timeout)
             response.raise_for_status()
 
             soup = BeautifulSoup(response.content, "html.parser")
@@ -1244,6 +1241,9 @@ def download_with_details(
     temp_dir: Optional[Path] = None,
     nohammer: bool = False,
     debug: bool = False,
+    retries: int = 3,
+    retry_backoff: float = 0.0,
+    rate_jitter: float = 0.0,
 ) -> LightDataFrame:
     """Download repeater data for a state with detailed information.
 
@@ -1260,7 +1260,13 @@ def download_with_details(
         LightDataFrame with basic and detailed repeater data
     """
     downloader = DetailedRepeaterDownloader(
-        rate_limit=rate_limit, temp_dir=temp_dir, nohammer=nohammer, debug=debug
+        rate_limit=rate_limit,
+        temp_dir=temp_dir,
+        nohammer=nohammer,
+        debug=debug,
+        retries=retries,
+        retry_backoff=retry_backoff,
+        rate_jitter=rate_jitter,
     )
     return downloader.download_with_details(
         level="state", state=state, country=country, bands=bands or ["all"]
@@ -1276,6 +1282,9 @@ def download_with_details_by_county(
     temp_dir: Optional[Path] = None,
     nohammer: bool = False,
     debug: bool = False,
+    retries: int = 3,
+    retry_backoff: float = 0.0,
+    rate_jitter: float = 0.0,
 ) -> LightDataFrame:
     """Download repeater data for a specific county with detailed information.
 
@@ -1293,7 +1302,13 @@ def download_with_details_by_county(
         LightDataFrame with basic and detailed repeater data
     """
     downloader = DetailedRepeaterDownloader(
-        rate_limit=rate_limit, temp_dir=temp_dir, nohammer=nohammer, debug=debug
+        rate_limit=rate_limit,
+        temp_dir=temp_dir,
+        nohammer=nohammer,
+        debug=debug,
+        retries=retries,
+        retry_backoff=retry_backoff,
+        rate_jitter=rate_jitter,
     )
     return downloader.download_with_details(
         level="county",
@@ -1313,6 +1328,9 @@ def download_with_details_by_city(
     temp_dir: Optional[Path] = None,
     nohammer: bool = False,
     debug: bool = False,
+    retries: int = 3,
+    retry_backoff: float = 0.0,
+    rate_jitter: float = 0.0,
 ) -> LightDataFrame:
     """Download repeater data for a specific city with detailed information.
 
@@ -1330,7 +1348,13 @@ def download_with_details_by_city(
         LightDataFrame with basic and detailed repeater data
     """
     downloader = DetailedRepeaterDownloader(
-        rate_limit=rate_limit, temp_dir=temp_dir, nohammer=nohammer, debug=debug
+        rate_limit=rate_limit,
+        temp_dir=temp_dir,
+        nohammer=nohammer,
+        debug=debug,
+        retries=retries,
+        retry_backoff=retry_backoff,
+        rate_jitter=rate_jitter,
     )
     return downloader.download_with_details(
         level="city", state=state, city=city, country=country, bands=bands or ["all"]
