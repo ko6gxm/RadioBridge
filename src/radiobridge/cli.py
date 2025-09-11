@@ -43,6 +43,7 @@ from radiobridge.radios import (
     default="text",
     show_default=True,
     help="Logging output format",
+    envvar="RADIOBRIDGE_LOG_FORMAT",
 )
 @click.pass_context
 def main(ctx: click.Context, verbose: bool, log_file: Optional[str], log_format: str) -> None:

@@ -356,6 +356,13 @@ rb --verbose download --state CA
 
 # Save logs to file
 rb --verbose --log-file debug.log download --state CA
+
+# Structured (JSON) logging to console
+rb --log-format json download --state CA
+
+# Structured logging via environment variable
+export RADIOBRIDGE_LOG_FORMAT=json
+rb download --state CA
 ```
 
 #### Python Library Logging
@@ -370,6 +377,17 @@ setup_logging(verbose=False, log_file="app.log")  # INFO to file
 import radiobridge
 data = radiobridge.download_repeater_data("CA")
 ```
+
+#### Structured (JSON) Logging
+- Use `--log-format json` (or `RADIOBRIDGE_LOG_FORMAT=json`) to emit structured JSON lines
+- Useful for log aggregation tools (jq, ELK, Datadog, etc.)
+- Includes helpful fields when available: url, status, content_type, elapsed_s, params, timeout, state_id
+
+#### CLI Exit Codes
+- `0` Success
+- `1` General error (validation, unsupported radio, etc.)
+- `2` HTTP/network error (e.g., timeouts, 5xx)
+- `3` Parse error (e.g., no repeater table found, invalid frequency data)
 
 #### What Gets Logged
 - **Download operations**: HTTP requests, response status, data parsing
