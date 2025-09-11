@@ -39,4 +39,3 @@ class NoRepeaterTableError(ParseError):
 
 class NoValidFrequencyDataError(ParseError):
     """Raised when no valid numeric frequency values are present after parsing/cleaning."""
-
