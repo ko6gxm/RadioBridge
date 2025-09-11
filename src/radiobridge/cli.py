@@ -320,7 +320,27 @@ def download(
         )
 
     except Exception as e:
-        logger.error(f"Download failed: {e}")
+        # Preserve current messaging but improve logging when we recognize typed errors
+        try:
+            from radiobridge.errors import HTTPRequestError, DownloaderError
+        except Exception:
+            HTTPRequestError = ()  # type: ignore
+            DownloaderError = ()  # type: ignore
+
+        if isinstance(e, HTTPRequestError):
+            # Log extended context for HTTP failures
+            logger.error(
+                f"Download failed (HTTP): {e}",
+                extra={
+                    "url": getattr(e, "url", None),
+                    "status": getattr(e, "status", None),
+                },
+            )
+        elif isinstance(e, DownloaderError):
+            logger.error(f"Download failed (downloader): {e}")
+        else:
+            logger.error(f"Download failed: {e}")
+
         click.echo(f"Error: {e}", err=True)
         sys.exit(1)
 

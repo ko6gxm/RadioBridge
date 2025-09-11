@@ -17,6 +17,11 @@ from bs4 import BeautifulSoup
 from radiobridge.downloader import RepeaterBookDownloader
 from radiobridge.lightweight_data import LightDataFrame, LightSeries, is_null, write_csv_light
 from radiobridge.logging_config import get_logger
+from radiobridge.errors import (
+    HTTPRequestError,
+    ParseError,
+    NoRepeaterTableError,
+)
 
 
 class DetailedRepeaterDownloader(RepeaterBookDownloader):
@@ -157,19 +162,19 @@ class DetailedRepeaterDownloader(RepeaterBookDownloader):
 
         except Exception as e:
             self.logger.error(f"HTTP request failed: {e}")
-            raise
+            raise HTTPRequestError(f"Failed to download repeater data: {e}", url=search_url)
 
         # Parse HTML with BeautifulSoup to extract both data and links
         soup = BeautifulSoup(response.content, "html.parser")
         # Find the main repeater table using base selector
         main_table = self._select_repeater_table(soup)
         if not main_table:
-            raise ValueError("No tables found in response")
+            raise NoRepeaterTableError("No tables found in response")
 
         # Extract data using BeautifulSoup and LightDataFrame
         table_data = self._parse_table_with_bs4(main_table)
         if not table_data:
-            raise ValueError("No data found in HTML table")
+            raise ParseError("No data found in HTML table")
         df = LightDataFrame.from_records(table_data)
 
         # Extract detail links from the same table
