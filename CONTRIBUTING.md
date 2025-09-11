@@ -254,11 +254,11 @@ def test_frequency_validation():
     """Test that invalid frequencies are rejected."""
     formatter = get_radio_formatter("anytone-878")
 
-    invalid_data = pd.DataFrame({
-        "frequency": ["invalid", "", "999.999"]
-    })
+    invalid_data = LightDataFrame.from_records([
+        {"frequency": "invalid"}, {"frequency": ""}, {"frequency": "999.999"}
+    ])
 
-    with pytest.raises(ValueError, match="Invalid frequency"):
+    with pytest.raises(ValueError):
         formatter.format(invalid_data)
 ```
 
@@ -310,7 +310,7 @@ One of the most valuable contributions is adding support for new radio models!
 ```python
 # src/radiobridge/radios/my_radio.py
 from typing import List
-import pandas as pd
+from radiobridge.lightweight_data import LightDataFrame
 from .base import BaseRadioFormatter
 from ..logging_config import get_logger
 
@@ -338,22 +338,22 @@ class MyRadioFormatter(BaseRadioFormatter):
     def output_columns(self) -> List[str]:
         return ["Channel", "Frequency", "Name", "Tone"]
 
-    def format(self, data: pd.DataFrame) -> pd.DataFrame:
+def format(self, data: LightDataFrame) -> LightDataFrame:
         """Format data for My Radio."""
         self.validate_input(data)
 
-        formatted_rows = []
-        for idx, row in data.iterrows():
-            # Your formatting logic here
+formatted_rows = []
+        for idx in range(len(data)):
+            row = data.iloc(idx)
             formatted_row = {
                 "Channel": idx + 1,
-                "Frequency": f"{float(row['frequency']):.4f}",
-                "Name": row.get('callsign', f'RPT{idx+1}'),
-                "Tone": row.get('tone', '88.5')
+                "Frequency": str(row.get("frequency")),
+                "Name": row.get('callsign') or f'RPT{idx+1}',
+                "Tone": row.get('tone') or '88.5'
             }
             formatted_rows.append(formatted_row)
 
-        return pd.DataFrame(formatted_rows)
+        return LightDataFrame.from_records(formatted_rows)
 ```
 
 #### 2. Register the Formatter

@@ -32,11 +32,11 @@ RadioBridge is designed as a modular, extensible system for downloading and form
 #### `radiobridge/csv_utils.py`
 - **Purpose**: CSV file operations and data validation
 - **Key Functions**:
-  - `read_csv()`: Enhanced pandas CSV reading with error handling
-  - `write_csv()`: CSV writing with directory creation
-  - `validate_csv_columns()`: Column presence validation
-  - `clean_csv_data()`: Data normalization
-- **Dependencies**: Pandas, pathlib
+- `read_csv()`: Robust CSV reading with error handling (no pandas dependency)
+- `write_csv()`: CSV writing with directory creation
+- `read_csv_comments()`: Read metadata comments from CSV files
+- `write_csv_with_comments()`: Write CSV with metadata comments
+- **Dependencies**: Standard library + lightweight data structures
 
 #### `radiobridge/downloader.py`
 - **Purpose**: Download repeater data from RepeaterBook.com
@@ -46,7 +46,7 @@ RadioBridge is designed as a modular, extensible system for downloading and form
   - Multiple download strategies (CSV export, HTML scraping)
   - Graceful fallbacks
   - Data cleaning and normalization
-- **Dependencies**: Requests, BeautifulSoup4, Pandas
+- **Dependencies**: Requests, BeautifulSoup4 (no pandas)
 
 ### Radio Formatters Package
 
@@ -195,7 +195,7 @@ Each radio formatter inherits from `BaseRadioFormatter`:
 
 ### Memory Efficiency
 - Stream processing for large datasets
-- Pandas operations optimized for memory usage
+- Lightweight in-memory structures (no pandas dependency)
 - Cleanup of temporary data
 
 ### Network Efficiency
@@ -204,9 +204,8 @@ Each radio formatter inherits from `BaseRadioFormatter`:
 - Respectful rate limiting
 
 ### Processing Efficiency
-- Vectorized pandas operations
 - Minimal data copying
-- Efficient data structures
+- Efficient custom data structures (LightDataFrame/LightSeries)
 
 ## Security Considerations
 

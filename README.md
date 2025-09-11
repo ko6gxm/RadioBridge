@@ -215,8 +215,12 @@ rb format repeaters.csv --radio anytone-878 --output programmed.csv
 rb download --state CA | \
 rb format --radio baofeng-k5 --output k5_ready.csv
 
+# New full-field formatters (exact CPS headers)
+rb format repeaters.csv --radio anytone-878-uvii --output anytone_878_uvii_full.csv
+rb format repeaters.csv --radio baofeng-dm32uv-full --output dm32uv_full.csv
+
 # Multiple radio formats from same data
-for radio in anytone-878 anytone-578 baofeng-dm32uv baofeng-k5; do
+for radio in anytone-878 anytone-578 anytone-878-uvii baofeng-dm32uv baofeng-dm32uv-full baofeng-k5; do
   rb format repeaters.csv --radio $radio --output "${radio}_repeaters.csv"
 done
 ```
@@ -269,40 +273,35 @@ setup_logging(verbose=True)  # Enable debug-level logging
 
 ### Advanced Usage
 
-#### Custom Data Processing
+#### Custom Data Processing (no pandas)
 
 ```python
-import pandas as pd
 from radiobridge import (
-    read_csv,
-    write_csv,
     download_repeater_data_by_county,
-    download_repeater_data_by_city
+    write_csv,
 )
+from radiobridge.band_filter import filter_by_frequency
+from radiobridge.lightweight_data import LightDataFrame
 from radiobridge.radios import get_radio_formatter
 
 # Download data for multiple counties in a state
 counties = ["Los Angeles", "Orange", "Riverside"]
-all_data = []
+records = []
 for county in counties:
-    county_data = download_repeater_data_by_county("CA", county)
-    all_data.append(county_data)
+    df = download_repeater_data_by_county("CA", county)
+    records.extend(df.to_dict(orient="records"))
 
-# Combine all county data
-combined_data = pd.concat(all_data, ignore_index=True)
+# Combine into a single dataset
+combined = LightDataFrame.from_records(records)
 
-# Filter data (example: only UHF repeaters)
-uhf_data = combined_data[combined_data['frequency'].astype(float) >= 400.0]
+# Filter by band (example: only 70cm/UHF)
+uhf_only = filter_by_frequency(combined, ["70cm"])
 
 # Format for multiple radios
-formatters = ['anytone-878', 'baofeng-k5']
-for radio in formatters:
+for radio in ["anytone-878-uvii", "baofeng-dm32uv-full"]:
     formatter = get_radio_formatter(radio)
-    formatted = formatter.format(uhf_data)
+    formatted = formatter.format(uhf_only)
     write_csv(formatted, f"{radio}_uhf_repeaters.csv")
-
-# Enable logging for troubleshooting
-setup_logging(verbose=True, log_file="processing.log")
 ```
 
 ## Development
@@ -449,10 +448,12 @@ radiobridge/
 │   └── radios/                 # Radio formatters
 │       ├── __init__.py         # Formatter registry
 │       ├── base.py             # Base formatter class
-│       ├── anytone_878.py      # Anytone 878 formatter
-│       ├── anytone_578.py      # Anytone 578 formatter
-│       ├── baofeng_dm32uv.py   # Baofeng DM-32UV formatter
-│       └── baofeng_k5_plus.py  # Baofeng K5 Plus formatter
+│       ├── anytone_878_v3.py      # Anytone 878 v3 formatter
+│       ├── anytone_878_v4.py      # Anytone 878 v4 formatter
+│       ├── anytone_878_uvii.py    # Anytone 878 UVII full-field formatter
+│       ├── baofeng_dm32uv.py      # Baofeng DM-32UV formatter
+│       ├── baofeng_dm32uv_full.py # Baofeng DM-32UV full-field formatter
+│       └── baofeng_k5_plus.py     # Baofeng K5 Plus formatter
 ├── tests/                       # Test suite
 ├── docs/                        # Documentation
 ├── pyproject.toml              # Project configuration
@@ -475,7 +476,7 @@ Example:
 ```python
 # src/radiobridge/radios/my_radio.py
 from typing import List
-import pandas as pd
+from radiobridge.lightweight_data import LightDataFrame
 from .base import BaseRadioFormatter
 
 class MyRadioFormatter(BaseRadioFormatter):
@@ -495,9 +496,16 @@ class MyRadioFormatter(BaseRadioFormatter):
     def output_columns(self) -> List[str]:
         return ["Channel", "Frequency", "Name"]
 
-    def format(self, data: pd.DataFrame) -> pd.DataFrame:
-        # Your formatting logic here
-        pass
+    def format(self, data: LightDataFrame) -> LightDataFrame:
+        rows = []
+        for i in range(len(data)):
+            row = data.iloc(i)
+            rows.append({
+                "Channel": i + 1,
+                "Frequency": str(row.get("frequency")),
+                "Name": row.get("callsign") or f"RPT{i+1}",
+            })
+        return LightDataFrame.from_records(rows)
 ```
 
 ## 🌍 Data Sources & Ethics

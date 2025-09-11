@@ -77,7 +77,7 @@ pipenv run rb download --state TX | pipenv run rb format --radio baofeng-k5 --ou
 - `src/radiobridge/cli.py`: Click-based command-line interface with two main commands: `download` and `format`
 - `src/radiobridge/downloader.py`: Basic RepeaterBook.com data fetcher
 - `src/radiobridge/detailed_downloader.py`: Enhanced scraper that fetches individual repeater detail pages for comprehensive data
-- `src/radiobridge/csv_utils.py`: Pandas-based CSV operations with data validation
+- `src/radiobridge/csv_utils.py`: Lightweight CSV operations with data validation
 - `src/radiobridge/radios/`: Radio formatter package with registry pattern
 
 ### Radio Formatter Plugin System
@@ -99,7 +99,7 @@ The project uses a registry pattern for radio formatters located in `src/radiobr
 1. **Create formatter module** in `src/radiobridge/radios/new_radio.py`:
 ```python
 from typing import List
-import pandas as pd
+from radiobridge.lightweight_data import LightDataFrame
 from .base import BaseRadioFormatter
 
 class NewRadioFormatter(BaseRadioFormatter):
@@ -119,13 +119,17 @@ class NewRadioFormatter(BaseRadioFormatter):
     def output_columns(self) -> List[str]:
         return ["Channel", "Frequency", "Name"]
 
-    def format(self, data: pd.DataFrame) -> pd.DataFrame:
+    def format(self, data: LightDataFrame) -> LightDataFrame:
         # Transform data to radio-specific format
-        formatted = pd.DataFrame()
-        formatted["Channel"] = range(1, len(data) + 1)
-        formatted["Frequency"] = data["frequency"]
-        formatted["Name"] = data["callsign"] + " " + data["location"]
-        return formatted
+        records = []
+        for i in range(len(data)):
+            row = data.iloc(i)
+            records.append({
+                "Channel": i + 1,
+                "Frequency": row.get("frequency"),
+                "Name": f"{row.get('callsign')} {row.get('location')}",
+            })
+        return LightDataFrame.from_records(records)
 ```
 
 2. **Register in `src/radiobridge/radios/__init__.py`**:

@@ -173,7 +173,7 @@ pip freeze > requirements.txt
 #### The pipenv Solution
 ```bash path=null start=null
 # Modern way - simple, automatic
-pipenv install requests pandas
+pipenv install requests
 pipenv run python my_script.py
 # That's it! Virtual environment handled automatically
 ```
@@ -199,8 +199,7 @@ pipenv run python my_script.py
 │ │                                             │ │
 │ │ Virtual Environment                         │ │
 │ │ ├─ requests==2.31.0                        │ │
-│ │ ├─ pandas==2.1.0                           │ │
-│ │ ├─ RadioBridge (editable install)        │ │
+│ │ ├─ RadioBridge (editable install)          │ │
 │ │ └─ dev dependencies (pytest, black, etc.)  │ │
 │ └─────────────────────────────────────────────┘ │
 └─────────────────────────────────────────────────┘
@@ -244,7 +243,7 @@ pipenv install
 #### Installing Packages
 ```bash path=null start=null
 # Install production dependencies
-pipenv install requests pandas click
+pipenv install requests click
 
 # Install development dependencies
 pipenv install pytest black flake8 --dev
