@@ -14,6 +14,7 @@ from .anytone_878_v3 import Anytone878V3Formatter
 from .anytone_878_v4 import Anytone878V4Formatter
 from .anytone_578 import Anytone578Formatter
 from .baofeng_dm32uv import BaofengDM32UVFormatter
+from .baofeng_dm32uv_full import BaofengDM32UVFullFormatter
 from .baofeng_k5_plus import BaofengK5PlusFormatter
 from .baofeng_uv5r import BaofengUV5RFormatter
 from .baofeng_uv28 import BaofengUV28Formatter
@@ -27,6 +28,7 @@ RADIO_FORMATTERS: Dict[str, Type[BaseRadioFormatter]] = {
     "anytone-878-v4": Anytone878V4Formatter,
     "anytone-578": Anytone578Formatter,
     "baofeng-dm32uv": BaofengDM32UVFormatter,
+    "baofeng-dm32uv-full": BaofengDM32UVFullFormatter,
     "baofeng-k5-plus": BaofengK5PlusFormatter,
     "baofeng-uv5r": BaofengUV5RFormatter,
     "baofeng-uv28": BaofengUV28Formatter,
@@ -54,6 +56,7 @@ RADIO_ALIASES: Dict[str, str] = {
     "anytone_578": "anytone-578",
     "578": "anytone-578",
     "dm32uv": "baofeng-dm32uv",
+    "dm32uv-full": "baofeng-dm32uv-full",
     "dm32": "baofeng-dm32uv",
     "dm-32uv": "baofeng-dm32uv",
     "k5": "baofeng-k5-plus",
