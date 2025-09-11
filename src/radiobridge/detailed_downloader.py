@@ -488,32 +488,68 @@ class DetailedRepeaterDownloader(RepeaterBookDownloader):
             # Frequencies: prefer detail page values, fall back to main table
             downlink = row_detail.get("downlink_freq") or basic_row.get("frequency", "")
             uplink = row_detail.get("uplink_freq") or ""
-            offset = row_detail.get("offset_mhz") or basic_row.get("offset", "")
+            offset_raw = row_detail.get("offset_mhz") or basic_row.get("offset", "")
 
-            # If offset missing but both freqs present, compute offset (uplink - downlink)
+            # Helpers to parse floats from possibly formatted strings
             def _to_float_safe(v):
                 try:
                     return float(str(v))
                 except Exception:
                     return None
 
-            if not offset:
-                dl_f = _to_float_safe(downlink)
-                ul_f = _to_float_safe(uplink)
-                if dl_f is not None and ul_f is not None:
-                    offset_val = ul_f - dl_f
-                    offset = f"{offset_val:.3f}"
+            def _parse_offset_mhz(val):
+                if val is None:
+                    return None
+                s = str(val)
+                # Extract first signed float in the string (handles '+2.5 MHz', '-0.600MHz', etc.)
+                import re as _re
+                m = _re.search(r"([+-]?\d+(?:\.\d+)?)", s)
+                if not m:
+                    return None
+                try:
+                    return float(m.group(1))
+                except Exception:
+                    return None
+
+            # Parse numeric offset if possible
+            off_num = _to_float_safe(offset_raw)
+            if off_num is None:
+                off_num = _parse_offset_mhz(offset_raw)
+
+            # Compute missing pieces
+            dl_f = _to_float_safe(downlink)
+            ul_f = _to_float_safe(uplink)
+
+            # If offset missing but both freqs present, compute offset (uplink - downlink)
+            if off_num is None and dl_f is not None and ul_f is not None:
+                off_num = ul_f - dl_f
 
             # If uplink missing but have downlink and offset, try compute
-            if not uplink:
-                dl_f = _to_float_safe(downlink)
-                off_f = _to_float_safe(offset)
-                if dl_f is not None and off_f is not None:
-                    uplink = f"{dl_f + off_f:.3f}"
+            if (uplink is None or str(uplink).strip() == "") and dl_f is not None and off_num is not None:
+                uplink = f"{dl_f + off_num:.3f}"
 
-            structured_dict["Downlink"].append(downlink or "")
-            structured_dict["Uplink"].append(uplink or "")
-            structured_dict["Offset"].append(offset or "")
+            # Output values (ensure numeric formatting for freqs when possible)
+            dl_out = downlink or ""
+            ul_out = uplink or ""
+            dl_num = _to_float_safe(dl_out)
+            if dl_num is not None:
+                dl_out = f"{dl_num:.3f}"
+            ul_num = _to_float_safe(ul_out)
+            if ul_num is not None:
+                ul_out = f"{ul_num:.3f}"
+            else:
+                # If non-numeric (e.g., 'CC'), blank it out
+                try:
+                    float(ul_out)
+                except Exception:
+                    ul_out = ""
+
+            structured_dict["Downlink"].append(dl_out)
+            structured_dict["Uplink"].append(ul_out)
+            if off_num is not None:
+                structured_dict["Offset"].append(f"{off_num:.3f}")
+            else:
+                structured_dict["Offset"].append(str(offset_raw) if offset_raw else "")
 
             # For tone data, we need to extract from basic data or detailed data
             structured_dict["Uplink Tone"].append(
@@ -602,7 +638,12 @@ class DetailedRepeaterDownloader(RepeaterBookDownloader):
     def _get_tone_data(
         self, basic_row: LightSeries, detail_data: Dict[str, Any], direction: str
     ) -> str:
-        """Extract tone data for uplink or downlink."""
+        """Extract tone data for uplink or downlink.
+
+        For DMR entries where base table may contain values like "CC 1",
+        normalize by capturing the color code into detail_data and avoid
+        placing "CC" strings into tone columns.
+        """
         if direction == "up":
             # Check detail data first, then basic data
             tone = detail_data.get(
@@ -613,7 +654,17 @@ class DetailedRepeaterDownloader(RepeaterBookDownloader):
                 "tone_down", basic_row.get("tone_down", basic_row.get("tone", ""))
             )
 
-        return str(tone) if tone else ""
+        if tone:
+            s = str(tone).strip()
+            import re
+            m = re.search(r"\bCC\s*(\d+)\b", s, re.IGNORECASE)
+            if m:
+                # Capture color code and keep tone field blank
+                if not detail_data.get("dmr_color_code"):
+                    detail_data["dmr_color_code"] = m.group(1)
+                return ""
+            return s
+        return ""
 
     def _extract_system_fusion(self, detail_data: Dict[str, Any]) -> str:
         """Extract System Fusion information."""
