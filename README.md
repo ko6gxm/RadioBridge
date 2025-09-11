@@ -187,6 +187,22 @@ rb --verbose download --state CA --debug
 
 # Custom output location
 rb download --state CA --output /path/to/my/repeaters.csv
+
+# Use the RepeaterBook JSON API instead of scraping (personal use; attribution required)
+# Tip: include your contact email via CLI or env var; API keys may be required for commercial use.
+export RADIOBRIDGE_RB_CONTACT_EMAIL=me@example.com
+rb download --state CA --source api --band 2m
+
+# How API filtering works (important)
+# - The CLI sends state_id (numeric) to the API for compatibility (e.g., CA → 06)
+# - Band values are mapped to API-compatible values:
+#     2m → 2m, 70cm → 440, 33cm → 900, 23cm → 1200 (6m and 4m map to themselves)
+# - When multiple bands (or "all") are requested, the request omits the band parameter
+#   and filters locally after fetch to honor your requested bands
+# - API responses are normalized (e.g., "Frequency" → "frequency") so band filtering is reliable
+
+# Try API first, then fall back to scraping automatically if rate-limited
+rb download --state CA --source auto
 ```
 
 #### Format for Your Radio

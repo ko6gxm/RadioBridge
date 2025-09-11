@@ -30,6 +30,23 @@ Based on investigation, RepeaterBook.com likely supports:
   - `city`: City name
   - Requires `state_id` and `loc` parameters as well
 
+## JSON Export API
+- Endpoint: `/api/export.php`
+- Typical parameters:
+  - `state_id` (required for US): Numeric state code (e.g., CA → 06). Prefer this over two-letter `state`.
+  - `country`: Country name (e.g., `United States`)
+  - `county` (optional): County name
+  - `city` (optional): City name
+  - `band` (optional): One of `All`, `6m`, `4m`, `2m`, `440`, `900`, `1200`
+    - CLI mapping: `70cm` → `440`, `33cm` → `900`, `23cm` → `1200`
+    - When multiple bands (or `all`) are requested at the CLI, the API call omits `band`
+      and RadioBridge applies client-side frequency filtering after fetch
+
+### Notes on HTTP 400 errors
+- Passing multiple bands like `2m,70cm` as a single `band` parameter will cause HTTP 400
+- Passing two-letter `state` can result in HTTP 400; use `state_id`
+- RadioBridge’s CLI now automatically uses `state_id`, maps bands, and omits `band` when needed
+
 ## CSV Export
 - CSV export endpoint: `/repeaters/downloads/index.php`
 - Parameters for CSV:
