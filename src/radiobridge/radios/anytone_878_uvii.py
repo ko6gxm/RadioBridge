@@ -181,7 +181,20 @@ class Anytone878UVIIFormatter(BaseRadioFormatter):
 
             # TX from canonical Uplink/Offset logic via get_tx_frequency fallback
             tx_raw = self.get_tx_frequency(row)
-            tx = self.clean_frequency(tx_raw) if tx_raw else rx
+            if tx_raw:
+                tx = self.clean_frequency(tx_raw)
+            else:
+                # Fallback: compute from offset if available
+                offset = self.clean_offset(self.get_offset_value(row))
+                if offset and offset != "0.000000":
+                    try:
+                        rx_float = float(rx)
+                        off_float = float(offset)
+                        tx = f"{rx_float + off_float:.6f}"
+                    except (ValueError, TypeError):
+                        tx = rx
+                else:
+                    tx = rx
 
             # Channel Name using helper; 16 chars is common for handheld CPS
             name = self.build_channel_name(row, max_length=16, location_slice=8)
