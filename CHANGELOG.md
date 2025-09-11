@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.4.2] - 2025-09-11
+
+### Fixed
+- Detailed downloader now preserves frequencies/offsets/tones by cleaning the main table before filtering and falling back to base table values when detail pages are incomplete.
+- Broadened frequency parsing on detail pages (Output/Receive for downlink; Input/Transmit for uplink).
+
 ## [0.4.0] - 2025-09-11
 
 ### Added
