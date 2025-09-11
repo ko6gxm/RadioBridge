@@ -1,11 +1,12 @@
 """Download repeater data from RepeaterBook.com."""
 
-class DownloaderError(Exception):
-    """Base class for downloader errors."""
-
-
-class ParseError(DownloaderError, ValueError):
-    """Raised when parsing downloaded content fails."""
+from radiobridge.errors import (
+    DownloaderError,
+    ParseError,
+    NoRepeaterTableError,
+    NoValidFrequencyDataError,
+    HTTPRequestError,
+)
 
 import tempfile
 from typing import Dict, List, Optional, Any
@@ -479,7 +480,11 @@ class RepeaterBookDownloader:
 
         except requests.RequestException as e:
             self.logger.error(f"HTTP request failed: {e}")
-            raise requests.RequestException(f"Failed to download repeater data: {e}")
+            raise HTTPRequestError(
+                f"Failed to download repeater data: {e}",
+                url=search_url,
+                status=getattr(getattr(e, 'response', None), 'status_code', None),
+            )
 
         # Parse HTML
         soup = BeautifulSoup(response.content, "html.parser")
@@ -500,13 +505,13 @@ class RepeaterBookDownloader:
             else:
                 location_desc = f"Location {state_id}"
             self.logger.error("No matching repeater table found", extra={"state_id": state_id, "params": params})
-            raise ValueError(f"No repeater table found for {location_desc}")
+            raise NoRepeaterTableError(f"No repeater table found for {location_desc}")
 
         # Parse table with BeautifulSoup instead of pandas
         try:
             table_data = self._parse_table_with_bs4(table)
             if not table_data:
-                raise ValueError("No data found in HTML table")
+                raise ParseError("No data found in HTML table")
 
             # Convert to LightDataFrame
             df = LightDataFrame.from_records(table_data)
