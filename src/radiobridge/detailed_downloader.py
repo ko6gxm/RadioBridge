@@ -87,6 +87,14 @@ class DetailedRepeaterDownloader(RepeaterBookDownloader):
             self.logger.info("Collecting basic data with detail links...")
             basic_data, detail_links = self._scrape_with_links(params)
 
+            # Clean and standardize column names before filtering (ensures we can
+            # fall back to frequency/offset/tone from the main table reliably)
+            try:
+                basic_data = self._clean_scraped_data(basic_data)
+            except Exception:
+                # If cleaning fails, proceed with raw data to avoid data loss
+                pass
+
             # Apply band filtering to basic data
             from radiobridge.band_filter import filter_by_frequency
 
@@ -476,10 +484,36 @@ class DetailedRepeaterDownloader(RepeaterBookDownloader):
             basic_row = basic_data.iloc(row_idx)
             row_detail = detailed_data.get(row_idx, {})
 
-            # Extract and map specific fields
-            structured_dict["Downlink"].append(row_detail.get("downlink_freq", ""))
-            structured_dict["Uplink"].append(row_detail.get("uplink_freq", ""))
-            structured_dict["Offset"].append(row_detail.get("offset_mhz", ""))
+            # Extract and map specific fields with robust fallbacks
+            # Frequencies: prefer detail page values, fall back to main table
+            downlink = row_detail.get("downlink_freq") or basic_row.get("frequency", "")
+            uplink = row_detail.get("uplink_freq") or ""
+            offset = row_detail.get("offset_mhz") or basic_row.get("offset", "")
+
+            # If offset missing but both freqs present, compute offset (uplink - downlink)
+            def _to_float_safe(v):
+                try:
+                    return float(str(v))
+                except Exception:
+                    return None
+
+            if not offset:
+                dl_f = _to_float_safe(downlink)
+                ul_f = _to_float_safe(uplink)
+                if dl_f is not None and ul_f is not None:
+                    offset_val = ul_f - dl_f
+                    offset = f"{offset_val:.3f}"
+
+            # If uplink missing but have downlink and offset, try compute
+            if not uplink:
+                dl_f = _to_float_safe(downlink)
+                off_f = _to_float_safe(offset)
+                if dl_f is not None and off_f is not None:
+                    uplink = f"{dl_f + off_f:.3f}"
+
+            structured_dict["Downlink"].append(downlink or "")
+            structured_dict["Uplink"].append(uplink or "")
+            structured_dict["Offset"].append(offset or "")
 
             # For tone data, we need to extract from basic data or detailed data
             structured_dict["Uplink Tone"].append(
@@ -1088,15 +1122,29 @@ class DetailedRepeaterDownloader(RepeaterBookDownloader):
             text: Page text to parse
             detail_data: Dictionary to store extracted data
         """
-        # Extract downlink frequency
-        downlink_match = re.search(r"Downlink:\s*(\d+\.\d+)", text)
-        if downlink_match:
-            detail_data["downlink_freq"] = downlink_match.group(1)
+        # Extract downlink frequency - support multiple labels used on detail pages
+        downlink_patterns = [
+            r"Downlink:\s*(\d+\.\d+)",
+            r"Output:\s*(\d+\.\d+)",
+            r"Receive:\s*(\d+\.\d+)",
+        ]
+        for pat in downlink_patterns:
+            m = re.search(pat, text, re.IGNORECASE)
+            if m:
+                detail_data["downlink_freq"] = m.group(1)
+                break
 
-        # Extract uplink frequency
-        uplink_match = re.search(r"Uplink:\s*(\d+\.\d+)", text)
-        if uplink_match:
-            detail_data["uplink_freq"] = uplink_match.group(1)
+        # Extract uplink frequency - multiple labels
+        uplink_patterns = [
+            r"Uplink:\s*(\d+\.\d+)",
+            r"Input:\s*(\d+\.\d+)",
+            r"Transmit:\s*(\d+\.\d+)",
+        ]
+        for pat in uplink_patterns:
+            m = re.search(pat, text, re.IGNORECASE)
+            if m:
+                detail_data["uplink_freq"] = m.group(1)
+                break
 
         # Extract offset with sign
         offset_match = re.search(r"Offset:\s*([+-]?\d+\.\d+)\s*MHz", text)

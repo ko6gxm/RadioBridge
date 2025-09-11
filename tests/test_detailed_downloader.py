@@ -272,6 +272,35 @@ class TestDetailedRepeaterDownloader:
         assert result.iloc(2)["DMR"] == "true"
         assert result.iloc(2)["Color Code"] == "1"
 
+    def test_structured_output_fallbacks_from_basic_table(self):
+        """When detail data lacks frequencies/offset/tones, fall back to basic table.
+        """
+        basic_data = LightDataFrame(
+            {
+                "frequency": ["146.520", "147.000"],
+                "tone": ["123.0", None],
+                "offset": ["0.600", "-0.600"],
+                "call": ["W6ABC", "K6XYZ"],
+            }
+        )
+        detailed_data = {
+            0: {},  # no detail info available
+            1: {"downlink_freq": "147.000"},
+        }
+        d = DetailedRepeaterDownloader()
+        out = d._create_structured_output(basic_data, detailed_data)
+        # Row 0: Downlink should fall back to frequency; offset should be from basic
+        assert out.iloc(0)["Downlink"] == "146.520"
+        assert out.iloc(0)["Offset"] == "0.600"
+        # Tone from basic 'tone' should appear as uplink/downlink tone via helper
+        assert out.iloc(0)["Uplink Tone"] == "123.0"
+        assert out.iloc(0)["Downlink Tone"] == "123.0"
+        # Row 1: has downlink in detail. Offset from basic, and uplink computed
+        assert out.iloc(1)["Downlink"] == "147.000"
+        assert out.iloc(1)["Offset"] == "-0.600"
+        # With downlink 147 and offset -0.600, uplink 146.400
+        assert out.iloc(1)["Uplink"] == "146.400"
+
 
 class TestDetailedDownloaderFunctions:
     """Test cases for module-level convenience functions."""
