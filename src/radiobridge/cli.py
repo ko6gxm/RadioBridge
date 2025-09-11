@@ -10,6 +10,8 @@ from radiobridge import __version__
 from radiobridge.band_filter import (
     validate_bands,
     format_band_list,
+    get_repeaterbook_band_param,
+    filter_by_frequency,
 )
 from radiobridge.csv_utils import (
     read_csv,
@@ -31,6 +33,8 @@ from radiobridge.radios import (
     list_radio_options,
     resolve_by_index,
 )
+from radiobridge.downloader import RepeaterBookDownloader
+from radiobridge.lightweight_data import LightDataFrame
 
 
 @click.group()
@@ -140,6 +144,23 @@ def main(ctx: click.Context, verbose: bool, log_file: Optional[str], log_format:
     show_default=True,
     help="Jitter (+/- seconds) applied to fixed rate-limit (ignored with --nohammer)",
 )
+@click.option(
+    "--source",
+    type=click.Choice(["scrape", "api", "auto"], case_sensitive=False),
+    default="scrape",
+    show_default=True,
+    help="Data source: 'scrape' (default), 'api' (use RepeaterBook API), or 'auto' (try API then fall back)",
+)
+@click.option(
+    "--contact-email",
+    envvar="RADIOBRIDGE_RB_CONTACT_EMAIL",
+    help="Contact email to include in API requests (respects env RADIOBRIDGE_RB_CONTACT_EMAIL)",
+)
+@click.option(
+    "--rb-api-key",
+    envvar="RADIOBRIDGE_RB_API_KEY",
+    help="API key for RepeaterBook API if required (env RADIOBRIDGE_RB_API_KEY)",
+)
 @click.pass_context
 def download(
     ctx: click.Context,
@@ -157,6 +178,9 @@ def download(
     retries: int,
     retry_backoff: float,
     rate_jitter: float,
+    source: str,
+    contact_email: Optional[str],
+    rb_api_key: Optional[str],
 ) -> None:
     """Download repeater data from RepeaterBook.com.
 
@@ -231,55 +255,151 @@ def download(
         logger.info(f"Starting download for {state}, {country}")
 
     try:
-        # All downloads now use detailed scraping for comprehensive data
-        if nohammer:
-            logger.info(
-                "Using detailed scraping with no-hammer mode " "(random delays 1-10s)"
-            )
-        else:
-            logger.info(f"Using detailed scraping with rate limit: {rate_limit}s")
+        # If API source requested (or auto), attempt API first
+        used_source = "scrape"
+        if source.lower() in ("api", "auto"):
+            try:
+                from radiobridge.providers import RepeaterBookAPIProvider
 
-        if search_type == "county":
-            data = download_with_details_by_county(
-                state=state,
-                county=county,
-                country=country,
-                bands=bands,
-                rate_limit=rate_limit,
-                temp_dir=temp_dir,
-                nohammer=nohammer,
-                debug=debug,
-                retries=retries,
-                retry_backoff=retry_backoff,
-                rate_jitter=rate_jitter,
-            )
-        elif search_type == "city":
-            data = download_with_details_by_city(
-                state=state,
-                city=city,
-                country=country,
-                bands=bands,
-                rate_limit=rate_limit,
-                temp_dir=temp_dir,
-                nohammer=nohammer,
-                debug=debug,
-                retries=retries,
-                retry_backoff=retry_backoff,
-                rate_jitter=rate_jitter,
-            )
-        else:
-            data = download_with_details(
-                state=state,
-                country=country,
-                bands=bands,
-                rate_limit=rate_limit,
-                temp_dir=temp_dir,
-                nohammer=nohammer,
-                debug=debug,
-                retries=retries,
-                retry_backoff=retry_backoff,
-                rate_jitter=rate_jitter,
-            )
+                logger.info("Using RepeaterBook API for listings")
+                # Build API parameters
+                # Prefer numeric state_id for API compatibility
+                state_id = RepeaterBookDownloader()._get_state_id(state)
+                api_params = {
+                    "country": country,
+                    "state_id": state_id,
+                }
+                if county:
+                    api_params["county"] = county
+                if city:
+                    api_params["city"] = city
+                # Bands: map to RepeaterBook API parameter; omit if 'All'
+                if bands:
+                    band_param = get_repeaterbook_band_param(bands)
+                    if band_param != "All":
+                        api_params["band"] = band_param
+
+                api = RepeaterBookAPIProvider(
+                    retries=retries,
+                    retry_backoff=retry_backoff,
+                    rate_jitter=rate_jitter,
+                    contact_email=contact_email,
+                    api_key=rb_api_key,
+                )
+                data = api.fetch(api_params)
+                # Normalize common column names so filtering works on API results
+                try:
+                    # Map common human-readable headers to normalized names
+                    column_mapping = {
+                        "Frequency": "frequency",
+                        "Offset": "offset",
+                        "Tone": "tone",
+                        "Call Sign": "callsign",
+                        "Callsign": "callsign",
+                        "Location": "location",
+                        "City": "city",
+                        "County": "county",
+                        "State": "state",
+                        "Use": "use",
+                        "Operational Status": "status",
+                    }
+                    orig_columns = data.columns
+                    new_columns = []
+                    new_data = {}
+                    seen = set()
+                    for old_col in orig_columns:
+                        # Default normalized form
+                        normalized = column_mapping.get(
+                            old_col,
+                            str(old_col).lower().replace(" ", "_") if old_col is not None else "",
+                        )
+                        # Heuristic: map likely frequency columns to 'frequency'
+                        lc = str(old_col).strip().lower() if old_col is not None else ""
+                        lc_us = lc.replace(" ", "_")
+                        if (
+                            lc in {"freq", "frequency"}
+                            or "downlink" in lc_us
+                            or "output" in lc_us
+                            or lc in {"rx", "receive"}
+                            or lc_us in {"downlink_freq", "downlink_frequency", "output_freq", "output_frequency"}
+                        ):
+                            normalized = "frequency"
+                        # Avoid duplicate columns: first wins
+                        if normalized in seen:
+                            continue
+                        seen.add(normalized)
+                        if old_col in data._data:
+                            new_data[normalized] = data._data[old_col]
+                        new_columns.append(normalized)
+                    # Rebuild DataFrame only if we actually changed something
+                    if new_columns and new_columns != orig_columns:
+                        data = LightDataFrame(new_data, new_columns)
+                except Exception:
+                    # If normalization fails, continue with original data
+                    pass
+
+                # Apply client-side band filtering to ensure CLI semantics match
+                if bands and bands != ["all"]:
+                    data = filter_by_frequency(data, bands)
+                used_source = "api"
+            except Exception as api_err:
+                if source.lower() == "api":
+                    raise
+                logger.warning(
+                    f"API path failed, falling back to scraping: {api_err}"
+                )
+
+        # If not using API (or after API failure in auto), use detailed scraping
+        if used_source != "api":
+            if nohammer:
+                logger.info(
+                    "Using detailed scraping with no-hammer mode (random delays 1-10s)"
+                )
+            else:
+                logger.info(f"Using detailed scraping with rate limit: {rate_limit}s")
+
+            if search_type == "county":
+                data = download_with_details_by_county(
+                    state=state,
+                    county=county,
+                    country=country,
+                    bands=bands,
+                    rate_limit=rate_limit,
+                    temp_dir=temp_dir,
+                    nohammer=nohammer,
+                    debug=debug,
+                    retries=retries,
+                    retry_backoff=retry_backoff,
+                    rate_jitter=rate_jitter,
+                )
+            elif search_type == "city":
+                data = download_with_details_by_city(
+                    state=state,
+                    city=city,
+                    country=country,
+                    bands=bands,
+                    rate_limit=rate_limit,
+                    temp_dir=temp_dir,
+                    nohammer=nohammer,
+                    debug=debug,
+                    retries=retries,
+                    retry_backoff=retry_backoff,
+                    rate_jitter=rate_jitter,
+                )
+            else:
+                data = download_with_details(
+                    state=state,
+                    country=country,
+                    bands=bands,
+                    rate_limit=rate_limit,
+                    temp_dir=temp_dir,
+                    nohammer=nohammer,
+                    debug=debug,
+                    retries=retries,
+                    retry_backoff=retry_backoff,
+                    rate_jitter=rate_jitter,
+                )
+            used_source = "scrape"
 
         # Generate output filename if not provided
         if output is None:
@@ -307,7 +427,7 @@ def download(
         if bands != ["all"]:
             metadata_comments["bands"] = ", ".join(bands)
 
-        metadata_comments["download_type"] = "detailed"
+        metadata_comments["download_type"] = "api" if used_source == "api" else "detailed"
         metadata_comments["total_repeaters"] = str(len(data))
 
         # Write CSV with metadata comments
@@ -437,6 +557,16 @@ def format(
 
         # Load the data (comments will be ignored)
         data = read_csv(input_file, comment="#")
+
+        # Normalize/augment schema for formatters without mutating source columns
+        try:
+            from radiobridge.schema_adapter import normalize_for_formatting
+            data = normalize_for_formatting(data, csv_metadata)
+            logger.debug(
+                f"Schema normalized for formatting: now {len(data.columns)} columns"
+            )
+        except Exception as e:
+            logger.warning(f"Schema normalization skipped due to error: {e}")
 
         # Get the formatter for the specified radio
         # Try to resolve by index first if it's a number, otherwise by name

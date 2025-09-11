@@ -185,7 +185,13 @@ class DetailedRepeaterDownloader(RepeaterBookDownloader):
             raise ParseError("No data found in HTML table")
         df = LightDataFrame.from_records(table_data)
 
-        # Extract detail links from the same table
+        # Clean and standardize before extracting links so column names align
+        try:
+            df = self._clean_scraped_data(df)
+        except Exception:
+            pass
+
+        # Extract detail links from the same table using cleaned df
         detail_links = self._extract_links_from_table(main_table, df)
 
         return df, detail_links
@@ -227,15 +233,15 @@ class DetailedRepeaterDownloader(RepeaterBookDownloader):
                         if row_index < len(df):
                             # Get row data safely
                             row_series = df.iloc(row_index)
-                            detail_links.append(
-                                {
-                                    "detail_url": detail_url,
-                                    "row_index": row_index,
-                                    "frequency": row_series.get("frequency", ""),
-                                    "callsign": row_series.get("call", ""),
-                                    "location": row_series.get("location", ""),
-                                }
-                            )
+            detail_links.append(
+                {
+                    "detail_url": detail_url,
+                    "row_index": row_index,
+                    "frequency": row_series.get("frequency", ""),
+                    "callsign": row_series.get("callsign", row_series.get("call", "")),
+                    "location": row_series.get("location", ""),
+                }
+            )
 
         self.logger.debug(f"Extracted {len(detail_links)} detail links")
         return detail_links
@@ -243,30 +249,92 @@ class DetailedRepeaterDownloader(RepeaterBookDownloader):
     def _filter_detail_links_by_data(
         self, detail_links: List[Dict[str, Any]], filtered_data: LightDataFrame
     ) -> List[Dict[str, Any]]:
-        """Filter detail links to only include those matching the filtered basic data.
+        """Map detail links to the filtered data rows by content, not original index.
 
-        Args:
-            detail_links: List of all detail links from the original scraping
-            filtered_data: LightDataFrame containing the filtered basic data
-
-        Returns:
-            List of detail links that correspond to rows in the filtered data
+        We match by frequency (with tolerance) and callsign (case-insensitive) when available.
+        Each link will be assigned to at most one filtered row.
         """
-        # Create a set of valid indices from the filtered data
-        # LightDataFrame uses row positions as indices
-        remaining_indices = set(range(len(filtered_data)))
+        def to_float(v):
+            try:
+                return float(str(v))
+            except Exception:
+                return None
 
-        # Filter detail links to only include those whose row_index is in remaining_indices
-        filtered_links = [
-            link for link in detail_links if link["row_index"] in remaining_indices
-        ]
+        def norm_freq(v):
+            f = to_float(v)
+            if f is None:
+                return None
+            # Round to 3 decimals for fingerprint
+            return round(f, 3)
+
+        def norm_text(v):
+            s = str(v or "").strip().upper()
+            # Normalize callsigns like 'W6ABC-R' -> 'W6ABC'
+            s = s.replace('-', '').replace(' ', '')
+            if s.endswith('R') and len(s) > 1:
+                s = s[:-1]
+            return s
+
+        # Build fingerprints for filtered rows
+        fp_to_row = {}
+        for row_idx in range(len(filtered_data)):
+            row = filtered_data.iloc(row_idx)
+            f = norm_freq(row.get("frequency", ""))
+            c = norm_text(row.get("call", row.get("callsign", "")))
+            l = norm_text(row.get("location", ""))
+            fp = (f, c, l)
+            if f is not None:
+                fp_to_row.setdefault(fp, row_idx)
+
+        # Attempt to map links by fingerprint first
+        used_rows = set()
+        mapped: List[Dict[str, Any]] = []
+        leftovers: List[Dict[str, Any]] = []
+        for link in detail_links:
+            lf = norm_freq(link.get("frequency", ""))
+            lc = norm_text(link.get("callsign", ""))
+            ll = norm_text(link.get("location", ""))
+            # Try exact triplet
+            row_idx = fp_to_row.get((lf, lc, ll))
+            if row_idx is None:
+                # Try without location
+                row_idx = fp_to_row.get((lf, lc, "")) or fp_to_row.get((lf, "", ""))
+            if row_idx is not None and row_idx not in used_rows:
+                link2 = dict(link)
+                link2["row_index"] = row_idx
+                mapped.append(link2)
+                used_rows.add(row_idx)
+            else:
+                leftovers.append(link)
+
+        # Fallback: map remaining by nearest frequency only to unused rows (tolerance widened)
+        unused_rows = [i for i in range(len(filtered_data)) if i not in used_rows]
+        for link in leftovers:
+            lf = norm_freq(link.get("frequency", ""))
+            if lf is None or not unused_rows:
+                continue
+            # Choose unused row with closest frequency
+            best = None
+            best_diff = None
+            for i in unused_rows:
+                rf = norm_freq(filtered_data.iloc(i).get("frequency", ""))
+                if rf is None:
+                    continue
+                d = abs(rf - lf)
+                if best is None or d < best_diff:
+                    best = i
+                    best_diff = d
+            # Only accept if reasonably close (<= 0.005 MHz)
+            if best is not None and best_diff is not None and best_diff <= 0.005:
+                link2 = dict(link)
+                link2["row_index"] = best
+                mapped.append(link2)
+                unused_rows.remove(best)
 
         self.logger.debug(
-            f"Filtered detail links from {len(detail_links)} to {len(filtered_links)} "
-            f"based on filtered data indices: {sorted(remaining_indices)}"
+            f"Mapped {len(mapped)}/{len(filtered_data)} detail links to filtered rows"
         )
-
-        return filtered_links
+        return mapped
 
     def _collect_detailed_data(
         self, detail_links: List[Dict[str, Any]], session_dir: Path
@@ -640,30 +708,63 @@ class DetailedRepeaterDownloader(RepeaterBookDownloader):
     ) -> str:
         """Extract tone data for uplink or downlink.
 
-        For DMR entries where base table may contain values like "CC 1",
-        normalize by capturing the color code into detail_data and avoid
-        placing "CC" strings into tone columns.
+        Handles DMR 'CC' (Color Code) values by setting dmr_color_code and
+        blanking the tone fields. If 'CC' appears alone in one column and the
+        numeric part is in the other (e.g., 'CC' and '1'), we combine them.
         """
-        if direction == "up":
-            # Check detail data first, then basic data
-            tone = detail_data.get(
-                "tone_up", basic_row.get("tone_up", basic_row.get("tone", ""))
-            )
-        else:  # direction == "down"
-            tone = detail_data.get(
-                "tone_down", basic_row.get("tone_down", basic_row.get("tone", ""))
-            )
+        import re
 
-        if tone:
-            s = str(tone).strip()
-            import re
-            m = re.search(r"\bCC\s*(\d+)\b", s, re.IGNORECASE)
-            if m:
-                # Capture color code and keep tone field blank
-                if not detail_data.get("dmr_color_code"):
-                    detail_data["dmr_color_code"] = m.group(1)
+        def _normalize_tone_value(x):
+            s = "" if x is None else str(x).strip()
+            if s.lower() in ("none", "nan", "null", "n/a", "na"):
                 return ""
             return s
+
+        def _get_pair_values() -> (str, str):
+            up_raw = detail_data.get(
+                "tone_up", basic_row.get("tone_up", basic_row.get("tone", ""))
+            )
+            down_raw = detail_data.get(
+                "tone_down", basic_row.get("tone_down", basic_row.get("tone", ""))
+            )
+            up = _normalize_tone_value(up_raw)
+            down = _normalize_tone_value(down_raw)
+            return up, down
+
+        up_val, down_val = _get_pair_values()
+        val = up_val if direction == "up" else down_val
+
+        def _extract_cc_number(txt: str):
+            if not txt:
+                return None
+            m = re.search(r"\b(?:CC|Color\s*Code)\s*(\d+)\b", txt, re.IGNORECASE)
+            if m:
+                return m.group(1)
+            # Sometimes format like 'CC-1' or 'CC1'
+            m = re.search(r"\bCC[- ]?(\d+)\b", txt, re.IGNORECASE)
+            if m:
+                return m.group(1)
+            return None
+
+        # If either up or down contains CC, capture color code and blank tones
+        cc_num = _extract_cc_number(val) or _extract_cc_number(up_val) or _extract_cc_number(down_val)
+        if (val.upper() == "CC" or up_val.upper() == "CC" or down_val.upper() == "CC") and not cc_num:
+            # Look for a bare number in either field that is not 'CC'
+            for cand in (up_val, down_val):
+                if cand.upper() == "CC":
+                    continue
+                m_other = re.search(r"\b(\d+)\b", cand)
+                if m_other:
+                    cc_num = m_other.group(1)
+                    break
+        if cc_num:
+            if not detail_data.get("dmr_color_code"):
+                detail_data["dmr_color_code"] = cc_num
+            return ""
+
+        # No CC; just return the tone value if present and not an obvious CC token
+        if val and not re.fullmatch(r"(?i:cc)", val):
+            return val
         return ""
 
     def _extract_system_fusion(self, detail_data: Dict[str, Any]) -> str:

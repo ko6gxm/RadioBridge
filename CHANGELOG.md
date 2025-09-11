@@ -46,6 +46,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- 🛠️ RepeaterBook JSON API 400 errors when using API source
+  - Use `state_id` (numeric) instead of two-letter `state` when calling `https://www.repeaterbook.com/api/export.php`
+  - Map CLI band selections to API-compatible values (e.g., `70cm` → `440`, `33cm` → `900`, `23cm` → `1200`)
+  - Omit the `band` parameter when the effective value is `All` (e.g., multiple bands), then apply client-side band filtering
+  - Normalize API response columns (e.g., `Frequency` → `frequency`) so frequency-based filtering is always effective
+
+### Documentation
+- Expanded README and repeaterbook_api.md with details on API parameters, band mapping, `state_id` usage, and client-side filtering behavior
+
 ### Removed
 - 🧹 **Deprecated static frequency modules**: Cleaned up orphaned static list functionality
   - Removed `static_cli.py`, `static_commands.py`, and `static_lists.py` modules

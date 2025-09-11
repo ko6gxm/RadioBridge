@@ -301,6 +301,38 @@ class TestDetailedRepeaterDownloader:
         # With downlink 147 and offset -0.600, uplink 146.400
         assert out.iloc(1)["Uplink"] == "146.400"
 
+    def test_cc_in_tone_columns_is_normalized_to_color_code(self):
+        """Ensure 'CC' in tone fields becomes Color Code and tone fields blank."""
+        basic = LightDataFrame(
+            {
+                "frequency": ["146.520"],
+                "tone_up": ["CC"],
+                "tone_down": ["1"],
+                "call": ["W6ABC"],
+            }
+        )
+        ddata = {0: {}}
+        d = DetailedRepeaterDownloader()
+        out = d._create_structured_output(basic, ddata)
+        # Tone fields should be blank, Color Code should be '1'
+        assert out.iloc(0)["Uplink Tone"] == ""
+        assert out.iloc(0)["Downlink Tone"] == ""
+        assert out.iloc(0)["Color Code"] == "1"
+
+    def test_tone_none_strings_normalized_to_blank(self):
+        basic = LightDataFrame(
+            {
+                "frequency": ["146.520"],
+                "tone_up": ["None"],
+                "tone_down": [None],
+                "call": ["W6ABC"],
+            }
+        )
+        d = DetailedRepeaterDownloader()
+        out = d._create_structured_output(basic, {})
+        assert out.iloc(0)["Uplink Tone"] == ""
+        assert out.iloc(0)["Downlink Tone"] == ""
+
 
 class TestDetailedDownloaderFunctions:
     """Test cases for module-level convenience functions."""
