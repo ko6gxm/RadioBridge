@@ -558,6 +558,16 @@ def format(
         # Load the data (comments will be ignored)
         data = read_csv(input_file, comment="#")
 
+        # Normalize/augment schema for formatters without mutating source columns
+        try:
+            from radiobridge.schema_adapter import normalize_for_formatting
+            data = normalize_for_formatting(data, csv_metadata)
+            logger.debug(
+                f"Schema normalized for formatting: now {len(data.columns)} columns"
+            )
+        except Exception as e:
+            logger.warning(f"Schema normalization skipped due to error: {e}")
+
         # Get the formatter for the specified radio
         # Try to resolve by index first if it's a number, otherwise by name
         formatter = None
