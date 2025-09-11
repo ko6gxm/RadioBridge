@@ -37,8 +37,16 @@ from radiobridge.radios import (
 @click.version_option(version=__version__)
 @click.option("--verbose", "-v", is_flag=True, help="Enable verbose logging output")
 @click.option("--log-file", type=click.Path(), help="Write logs to specified file")
+@click.option(
+    "--log-format",
+    type=click.Choice(["text", "json"], case_sensitive=False),
+    default="text",
+    show_default=True,
+    help="Logging output format",
+    envvar="RADIOBRIDGE_LOG_FORMAT",
+)
 @click.pass_context
-def main(ctx: click.Context, verbose: bool, log_file: Optional[str]) -> None:
+def main(ctx: click.Context, verbose: bool, log_file: Optional[str], log_format: str) -> None:
     """Professional Amateur Radio Repeater Programming.
 
     Bridge RepeaterBook data to popular radio models with advanced features
@@ -48,9 +56,10 @@ def main(ctx: click.Context, verbose: bool, log_file: Optional[str]) -> None:
     ctx.ensure_object(dict)
     ctx.obj["verbose"] = verbose
     ctx.obj["log_file"] = log_file
+    ctx.obj["log_format"] = log_format
 
     # Set up logging early
-    setup_logging(verbose=verbose, log_file=log_file)
+    setup_logging(verbose=verbose, log_file=log_file, log_format=log_format)
 
 
 @main.command()
@@ -171,7 +180,11 @@ def download(
     """
     # Reconfigure logging if debug mode is requested
     if debug:
-        setup_logging(verbose=True, log_file=ctx.obj.get("log_file"))
+        setup_logging(
+            verbose=True,
+            log_file=ctx.obj.get("log_file"),
+            log_format=ctx.obj.get("log_format", "text"),
+        )
 
     logger = get_logger(__name__)
 
@@ -322,11 +335,13 @@ def download(
     except Exception as e:
         # Preserve current messaging but improve logging when we recognize typed errors
         try:
-            from radiobridge.errors import HTTPRequestError, DownloaderError
+            from radiobridge.errors import HTTPRequestError, DownloaderError, ParseError
         except Exception:
             HTTPRequestError = ()  # type: ignore
             DownloaderError = ()  # type: ignore
+            ParseError = ()  # type: ignore
 
+        exit_code = 1
         if isinstance(e, HTTPRequestError):
             # Log extended context for HTTP failures
             logger.error(
@@ -336,13 +351,18 @@ def download(
                     "status": getattr(e, "status", None),
                 },
             )
+            exit_code = 2
+        elif isinstance(e, ParseError):
+            logger.error(f"Download failed (parse): {e}")
+            exit_code = 3
         elif isinstance(e, DownloaderError):
             logger.error(f"Download failed (downloader): {e}")
+            exit_code = 1
         else:
             logger.error(f"Download failed: {e}")
 
         click.echo(f"Error: {e}", err=True)
-        sys.exit(1)
+        sys.exit(exit_code)
 
 
 @main.command()
@@ -528,9 +548,34 @@ def format(
         )
 
     except Exception as e:
-        logger.error(f"Format failed: {e}")
+        try:
+            from radiobridge.errors import HTTPRequestError, DownloaderError, ParseError
+        except Exception:
+            HTTPRequestError = ()  # type: ignore
+            DownloaderError = ()  # type: ignore
+            ParseError = ()  # type: ignore
+
+        exit_code = 1
+        if isinstance(e, HTTPRequestError):
+            logger.error(
+                f"Format failed (HTTP): {e}",
+                extra={
+                    "url": getattr(e, "url", None),
+                    "status": getattr(e, "status", None),
+                },
+            )
+            exit_code = 2
+        elif isinstance(e, ParseError):
+            logger.error(f"Format failed (parse): {e}")
+            exit_code = 3
+        elif isinstance(e, DownloaderError):
+            logger.error(f"Format failed (downloader): {e}")
+            exit_code = 1
+        else:
+            logger.error(f"Format failed: {e}")
+
         click.echo(f"Error: {e}", err=True)
-        sys.exit(1)
+        sys.exit(exit_code)
 
 
 @main.command("list-radios")
