@@ -140,11 +140,14 @@ class LightDataFrame:
         if not records:
             return cls()
         
-        # Get all unique column names
-        columns = set()
+        # Determine column order by first appearance across records
+        columns: List[str] = []
+        seen = set()
         for record in records:
-            columns.update(record.keys())
-        columns = sorted(list(columns))
+            for col in record.keys():
+                if col not in seen:
+                    seen.add(col)
+                    columns.append(col)
         
         # Convert to column-oriented data
         data = {}

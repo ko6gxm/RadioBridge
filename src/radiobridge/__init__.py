@@ -5,7 +5,7 @@ intelligently formatting it for popular ham radio models including Anytone, Baof
 and others with advanced targeting and rate limiting.
 """
 
-__version__ = "0.5.0"
+__version__ = "0.5.1"
 __author__ = "Craig Simon"
 __email__ = "craig@ko6gxm.com"
 
