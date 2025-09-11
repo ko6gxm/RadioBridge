@@ -1,5 +1,29 @@
 # Changelog
 
+All notable changes to this project will be documented in this file.
+
+## [0.4.0] - 2025-09-11
+
+### Added
+- CLI: JSON logging output via `--log-format json` (or `RADIOBRIDGE_LOG_FORMAT=json`).
+- Typed CLI exit codes: `2` for HTTP/network errors, `3` for parse errors (others remain `1`).
+- Common typed errors module: `radiobridge.errors` (`HTTPRequestError`, `ParseError`, etc.).
+
+### Improved
+- Downloader logging with contextual fields (url, status, content-type, elapsed).
+- Detailed downloader now raises typed errors for clearer failure modes.
+- README updated to document JSON logging, env var fallback, and exit codes.
+
+### Fixed
+- Test issues around kw-only constructor usage for `UnifiedDownloader`.
+
+## [0.3.0] - 2025-09-10
+- Previous minor release (see repository history).
+
+[0.4.0]: https://github.com/ko6gxm/RadioBridge/releases/tag/v0.4.0
+
+# Changelog
+
 *All notable changes to RadioBridge will be documented in this file.*
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
