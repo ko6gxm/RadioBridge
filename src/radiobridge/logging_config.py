@@ -1,25 +1,62 @@
 """Logging configuration for radiobridge."""
 
+import json
 import logging
 import sys
 from typing import Optional
 
 
-def setup_logging(verbose: bool = False, log_file: Optional[str] = None) -> None:
+class JSONFormatter(logging.Formatter):
+    """Simple JSON formatter for structured logs."""
+
+    def format(self, record: logging.LogRecord) -> str:
+        payload = {
+            "timestamp": self.formatTime(record, datefmt="%Y-%m-%dT%H:%M:%S"),
+            "logger": record.name,
+            "level": record.levelname,
+            "message": record.getMessage(),
+        }
+        # Whitelist some common extra fields used across the codebase
+        for key in (
+            "url",
+            "status",
+            "content_type",
+            "elapsed_s",
+            "params",
+            "timeout",
+            "state_id",
+        ):
+            if hasattr(record, key):
+                try:
+                    payload[key] = getattr(record, key)
+                except Exception:
+                    payload[key] = str(getattr(record, key))
+        return json.dumps(payload, ensure_ascii=False)
+
+
+def setup_logging(
+    verbose: bool = False,
+    log_file: Optional[str] = None,
+    log_format: str = "text",
+) -> None:
     """Set up logging configuration for radiobridge.
 
     Args:
         verbose: If True, set log level to DEBUG, otherwise INFO
         log_file: Optional path to log file. If None, logs only to console
+        log_format: 'text' (default) or 'json' for structured logging
     """
     # Determine log level
     log_level = logging.DEBUG if verbose else logging.INFO
 
-    # Create formatter
-    formatter = logging.Formatter(
-        "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-    )
+    # Choose formatter
+    if (log_format or "text").lower() == "json":
+        formatter: logging.Formatter = JSONFormatter()
+    else:
+        formatter = logging.Formatter(
+            "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+            datefmt="%Y-%m-%d %H:%M:%S",
+        )
 
     # Get root logger for radiobridge
     logger = logging.getLogger("radiobridge")
@@ -47,7 +84,9 @@ def setup_logging(verbose: bool = False, log_file: Optional[str] = None) -> None
     logger.propagate = True
 
     # Log initial setup
-    logger.debug(f"Logging configured - Level: {logging.getLevelName(log_level)}")
+    logger.debug(
+        f"Logging configured - Level: {logging.getLevelName(log_level)}; Format: {log_format}"
+    )
 
 
 def get_logger(name: str) -> logging.Logger:

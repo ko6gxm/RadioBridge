@@ -280,6 +280,26 @@ class TestDownloadCommand:
         assert result.exit_code == 1
         assert "Error: Test error" in result.output
 
+    @patch("radiobridge.cli.download_with_details")
+    def test_download_http_error_exit_code(self, mock_download):
+        """HTTP errors should return exit code 2."""
+        from radiobridge.errors import HTTPRequestError
+
+        mock_download.side_effect = HTTPRequestError("HTTP boom", url="https://x", status=503)
+        result = self.runner.invoke(main, ["download", "--state", "CA"])
+        assert result.exit_code == 2
+        assert "Error: HTTP boom" in result.output
+
+    @patch("radiobridge.cli.download_with_details")
+    def test_download_parse_error_exit_code(self, mock_download):
+        """Parse errors should return exit code 3."""
+        from radiobridge.errors import ParseError
+
+        mock_download.side_effect = ParseError("Parse boom")
+        result = self.runner.invoke(main, ["download", "--state", "CA"])
+        assert result.exit_code == 3
+        assert "Error: Parse boom" in result.output
+
     def test_download_country_parameter(self):
         """Test that country parameter is passed through correctly."""
         with patch("radiobridge.cli.download_with_details") as mock_download:
