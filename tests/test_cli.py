@@ -84,6 +84,9 @@ class TestDownloadCommand:
             temp_dir=None,
             nohammer=False,
             debug=False,
+            retries=3,
+            retry_backoff=0.0,
+            rate_jitter=0.0,
         )
         mock_write_csv.assert_called_once()
         assert "Successfully downloaded 2 repeaters from CA" in result.output
@@ -118,6 +121,9 @@ class TestDownloadCommand:
             temp_dir=None,
             nohammer=False,
             debug=False,
+            retries=3,
+            retry_backoff=0.0,
+            rate_jitter=0.0,
         )
         mock_write_csv.assert_called_once()
         assert (
@@ -155,6 +161,9 @@ class TestDownloadCommand:
             temp_dir=None,
             nohammer=False,
             debug=False,
+            retries=3,
+            retry_backoff=0.0,
+            rate_jitter=0.0,
         )
         mock_write_csv.assert_called_once()
         assert "Successfully downloaded 2 repeaters from Austin, TX" in result.output
@@ -255,6 +264,9 @@ class TestDownloadCommand:
             temp_dir=None,
             nohammer=False,
             debug=False,
+            retries=3,
+            retry_backoff=0.0,
+            rate_jitter=0.0,
         )
         mock_write_csv.assert_called_once()
 
@@ -288,7 +300,7 @@ class TestDownloadCommand:
                 )
 
             assert result.exit_code == 0
-            mock_download.assert_called_once_with(
+        mock_download.assert_called_once_with(
                 state="ON",
                 country="Canada",
                 bands=["all"],
@@ -296,6 +308,9 @@ class TestDownloadCommand:
                 temp_dir=None,
                 nohammer=False,
                 debug=False,
+                retries=3,
+                retry_backoff=0.0,
+                rate_jitter=0.0,
             )
 
     @patch("radiobridge.cli.download_with_details")
@@ -333,6 +348,9 @@ class TestDownloadCommand:
             temp_dir=None,
             nohammer=True,  # But also passes the nohammer flag
             debug=False,  # Debug flag is passed as False by default
+            retries=3,
+            retry_backoff=0.0,
+            rate_jitter=0.0,
         )
         mock_write_csv.assert_called_once()
 
@@ -369,6 +387,9 @@ class TestDownloadCommand:
             temp_dir=None,
             nohammer=True,
             debug=False,
+            retries=3,
+            retry_backoff=0.0,
+            rate_jitter=0.0,
         )
         mock_write_csv.assert_called_once()
 

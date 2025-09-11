@@ -201,6 +201,226 @@ class TestRepeaterBookDownloader:
         assert is_null(cleaned["location"][1])
 
 
+class TestCSVExportPath:
+    """Tests for CSV export happy paths and retry behavior."""
+
+    @responses.activate
+    def test_csv_export_state_success(self):
+        csv_url = "https://www.repeaterbook.com/repeaters/downloads/index.php"
+        csv_body = "frequency,callsign,location\n146.520000,W6ABC,Los Angeles\n"
+        responses.add(
+            responses.GET,
+            csv_url,
+            status=200,
+            headers={"Content-Type": "text/csv"},
+            body=csv_body,
+        )
+        downloader = RepeaterBookDownloader()
+        df = downloader.download_by_state("CA", country="United States")
+        assert len(df) == 1
+        assert "frequency" in df.columns
+        # Ensure only the CSV endpoint was called
+        assert len(responses.calls) == 1
+        assert "downloads/index.php" in responses.calls[0].request.url
+        # Ensure params include state and country
+        assert "state_id=06" in responses.calls[0].request.url
+        assert "country=United+States" in responses.calls[0].request.url
+
+    @responses.activate
+    def test_csv_export_county_success(self):
+        csv_url = "https://www.repeaterbook.com/repeaters/downloads/index.php"
+        csv_body = "frequency,callsign,location\n147.000000,K6XYZ,Los Angeles\n"
+        responses.add(
+            responses.GET,
+            csv_url,
+            status=200,
+            headers={"Content-Type": "text/csv"},
+            body=csv_body,
+        )
+        downloader = RepeaterBookDownloader()
+        df = downloader.download_by_county("CA", "Los Angeles", country="United States")
+        assert len(df) == 1
+        # Ensure params include county and country
+        assert "county=Los+Angeles" in responses.calls[0].request.url
+        assert "country=United+States" in responses.calls[0].request.url
+
+    @responses.activate
+    def test_csv_export_city_success(self):
+        csv_url = "https://www.repeaterbook.com/repeaters/downloads/index.php"
+        csv_body = "frequency,callsign,location\n444.125000,N5DEF,Austin\n"
+        responses.add(
+            responses.GET,
+            csv_url,
+            status=200,
+            headers={"Content-Type": "text/csv"},
+            body=csv_body,
+        )
+        downloader = RepeaterBookDownloader()
+        df = downloader.download_by_city("TX", "Austin", country="United States")
+        assert len(df) == 1
+        # Ensure params include city and country
+        assert "city=Austin" in responses.calls[0].request.url
+        assert "country=United+States" in responses.calls[0].request.url
+
+    @responses.activate
+    def test_csv_export_retry_on_503_then_200(self):
+        csv_url = "https://www.repeaterbook.com/repeaters/downloads/index.php"
+        # First call fails with 503, second succeeds
+        responses.add(
+            responses.GET,
+            csv_url,
+            status=503,
+            headers={"Content-Type": "text/html"},
+            body="Service Unavailable",
+        )
+        responses.add(
+            responses.GET,
+            csv_url,
+            status=200,
+            headers={"Content-Type": "text/csv"},
+            body="frequency,callsign\n146.520000,W6ABC\n",
+        )
+        downloader = RepeaterBookDownloader()
+        df = downloader.download_by_state("CA", country="United States")
+        # Should have retried and succeeded
+        assert len(df) == 1
+        assert len(responses.calls) == 2
+
+    @responses.activate
+    def test_csv_content_type_fallback_to_html(self):
+        # CSV endpoint returns 200 but not text/csv -> fallback to HTML scraping
+        csv_url = "https://www.repeaterbook.com/repeaters/downloads/index.php"
+        html_search_url = "https://www.repeaterbook.com/repeaters/location_search.php"
+        responses.add(
+            responses.GET,
+            csv_url,
+            status=200,
+            headers={"Content-Type": "text/html"},
+            body="<html><body>Not CSV</body></html>",
+        )
+        # Minimal valid table with expected headers
+        html_body = """
+        <html><body>
+          <table class="w3-table">
+            <tr><th>Frequency</th><th>Call Sign</th><th>Location</th></tr>
+            <tr><td>146.520000</td><td>W6ABC</td><td>LA</td></tr>
+          </table>
+        </body></html>
+        """
+        responses.add(
+            responses.GET,
+            html_search_url,
+            status=200,
+            headers={"Content-Type": "text/html"},
+            body=html_body,
+        )
+        downloader = RepeaterBookDownloader()
+        df = downloader.download_by_state("CA", country="United States")
+        assert len(df) == 1
+        assert "frequency" in df.columns
+        # Ensure both endpoints were called
+        assert any("downloads/index.php" in c.request.url for c in responses.calls)
+        assert any("location_search.php" in c.request.url for c in responses.calls)
+
+    @responses.activate
+    def test_retry_param_customization_fallback(self):
+        # With retries=0, CSV 503 should not retry and should fall back to HTML path
+        csv_url = "https://www.repeaterbook.com/repeaters/downloads/index.php"
+        html_search_url = "https://www.repeaterbook.com/repeaters/location_search.php"
+        responses.add(
+            responses.GET,
+            csv_url,
+            status=503,
+            headers={"Content-Type": "text/html"},
+            body="Service Unavailable",
+        )
+        html_body = """
+        <html><body>
+          <table class="w3-table">
+            <tr><th>Frequency</th><th>Call</th><th>Location</th></tr>
+            <tr><td>147.000000</td><td>K6XYZ</td><td>SF</td></tr>
+          </table>
+        </body></html>
+        """
+        responses.add(
+            responses.GET,
+            html_search_url,
+            status=200,
+            headers={"Content-Type": "text/html"},
+            body=html_body,
+        )
+        # Instantiate with retries=0
+        downloader = RepeaterBookDownloader(retries=0)
+        df = downloader.download_by_state("CA", country="United States")
+        assert len(df) == 1
+        assert any("downloads/index.php" in c.request.url for c in responses.calls)
+        assert any("location_search.php" in c.request.url for c in responses.calls)
+
+
+class TestHTMLValidation:
+    """Tests for HTML table validation robustness."""
+
+    @responses.activate
+    def test_no_matching_headers_raises(self):
+        html_search_url = "https://www.repeaterbook.com/repeaters/location_search.php"
+        # HTML with a table but no expected headers
+        html_body = """
+        <html><body>
+          <table>
+            <tr><th>Foo</th><th>Bar</th><th>Baz</th></tr>
+            <tr><td>1</td><td>2</td><td>3</td></tr>
+          </table>
+        </body></html>
+        """
+        responses.add(
+            responses.GET,
+            html_search_url,
+            status=200,
+            headers={"Content-Type": "text/html"},
+            body=html_body,
+        )
+        # Force CSV failure so code uses HTML path
+        csv_url = "https://www.repeaterbook.com/repeaters/downloads/index.php"
+        responses.add(
+            responses.GET,
+            csv_url,
+            status=404,
+        )
+        downloader = RepeaterBookDownloader()
+        with pytest.raises(ValueError):
+            downloader.download_by_state("CA")
+
+    @responses.activate
+    def test_no_valid_frequency_data_raises(self):
+        html_search_url = "https://www.repeaterbook.com/repeaters/location_search.php"
+        # HTML with expected headers but invalid frequency cell
+        html_body = """
+        <html><body>
+          <table class="w3-table">
+            <tr><th>Frequency</th><th>Call Sign</th><th>Location</th></tr>
+            <tr><td>ABC</td><td>W6ABC</td><td>LA</td></tr>
+          </table>
+        </body></html>
+        """
+        responses.add(
+            responses.GET,
+            html_search_url,
+            status=200,
+            headers={"Content-Type": "text/html"},
+            body=html_body,
+        )
+        # Force CSV failure so code uses HTML path
+        csv_url = "https://www.repeaterbook.com/repeaters/downloads/index.php"
+        responses.add(
+            responses.GET,
+            csv_url,
+            status=404,
+        )
+        downloader = RepeaterBookDownloader()
+        with pytest.raises(ValueError, match="No valid frequency data"):
+            downloader.download_by_state("CA")
+
+
 class TestConvenienceFunctions:
     """Test top-level convenience functions."""
 
@@ -225,7 +445,13 @@ class TestConvenienceFunctions:
         )
 
         mock_downloader_class.assert_called_once_with(
-            rate_limit=1.5, temp_dir=None, nohammer=False, debug=False
+            rate_limit=1.5,
+            temp_dir=None,
+            nohammer=False,
+            debug=False,
+            retries=3,
+            retry_backoff=0.0,
+            rate_jitter=0.0,
         )
         mock_downloader.download_with_details.assert_called_once_with(
             level="county",
@@ -257,7 +483,13 @@ class TestConvenienceFunctions:
         )
 
         mock_downloader_class.assert_called_once_with(
-            rate_limit=1.5, temp_dir=None, nohammer=False, debug=False
+            rate_limit=1.5,
+            temp_dir=None,
+            nohammer=False,
+            debug=False,
+            retries=3,
+            retry_backoff=0.0,
+            rate_jitter=0.0,
         )
         mock_downloader.download_with_details.assert_called_once_with(
             level="city",
@@ -288,7 +520,13 @@ class TestConvenienceFunctions:
         )
 
         mock_downloader_class.assert_called_once_with(
-            rate_limit=1.5, temp_dir=None, nohammer=False, debug=False
+            rate_limit=1.5,
+            temp_dir=None,
+            nohammer=False,
+            debug=False,
+            retries=3,
+            retry_backoff=0.0,
+            rate_jitter=0.0,
         )
         mock_downloader.download_with_details.assert_called_once_with(
             level="state", state="CA", country="United States", bands=["all"]

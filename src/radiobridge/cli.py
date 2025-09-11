@@ -110,6 +110,27 @@ def main(ctx: click.Context, verbose: bool, log_file: Optional[str]) -> None:
     is_flag=True,
     help="Enable debug logging to show all collected data from each detail page",
 )
+@click.option(
+    "--retries",
+    type=int,
+    default=3,
+    show_default=True,
+    help="Number of HTTP retry attempts for transient failures",
+)
+@click.option(
+    "--retry-backoff",
+    type=float,
+    default=0.0,
+    show_default=True,
+    help="Exponential backoff factor between retries (seconds)",
+)
+@click.option(
+    "--rate-jitter",
+    type=float,
+    default=0.0,
+    show_default=True,
+    help="Jitter (+/- seconds) applied to fixed rate-limit (ignored with --nohammer)",
+)
 @click.pass_context
 def download(
     ctx: click.Context,
@@ -124,6 +145,9 @@ def download(
     temp_dir: Optional[Path],
     nohammer: bool,
     debug: bool,
+    retries: int,
+    retry_backoff: float,
+    rate_jitter: float,
 ) -> None:
     """Download repeater data from RepeaterBook.com.
 
@@ -212,6 +236,9 @@ def download(
                 temp_dir=temp_dir,
                 nohammer=nohammer,
                 debug=debug,
+                retries=retries,
+                retry_backoff=retry_backoff,
+                rate_jitter=rate_jitter,
             )
         elif search_type == "city":
             data = download_with_details_by_city(
@@ -223,6 +250,9 @@ def download(
                 temp_dir=temp_dir,
                 nohammer=nohammer,
                 debug=debug,
+                retries=retries,
+                retry_backoff=retry_backoff,
+                rate_jitter=rate_jitter,
             )
         else:
             data = download_with_details(
@@ -233,6 +263,9 @@ def download(
                 temp_dir=temp_dir,
                 nohammer=nohammer,
                 debug=debug,
+                retries=retries,
+                retry_backoff=retry_backoff,
+                rate_jitter=rate_jitter,
             )
 
         # Generate output filename if not provided
