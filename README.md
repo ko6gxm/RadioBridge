@@ -65,6 +65,32 @@ pip install radiobridge
 pip install git+https://github.com/ko6gxm/radiobridge.git
 ```
 
+### macOS Binary (Prebuilt)
+
+You can download a prebuilt macOS binary from the Releases page.
+
+- Architectures: arm64 (Apple Silicon) and x86_64 (Intel)
+- File names: rb-macos-arm64, rb-macos-x86_64
+
+Usage:
+
+```bash
+# Make it executable (if needed)
+chmod +x ./rb-macos-arm64
+
+# Verify
+./rb-macos-arm64 --version
+
+# Example
+./rb-macos-arm64 download --state CA
+```
+
+Gatekeeper (first run on macOS):
+- Right-click the file → Open → Confirm to run an unsigned binary
+- Or remove quarantine attribute (advanced): `xattr -dr com.apple.quarantine ./rb-macos-arm64`
+
+Note: Binaries are not codesigned/notarized.
+
 ### Development Installation
 
 ```bash
