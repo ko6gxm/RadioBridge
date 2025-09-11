@@ -46,6 +46,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.2] - 2025-09-11
+
+### Fixed
+- CI: add cross-platform test matrix (Ubuntu/macOS/Windows) and ensure test deps installed
+- CSV: verified header order preserved via new test on all OS runners
+
 ## [0.5.1] - 2025-09-11
 
 ### Fixed
