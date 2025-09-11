@@ -19,6 +19,7 @@ from .baofeng_uv5r import BaofengUV5RFormatter
 from .baofeng_uv28 import BaofengUV28Formatter
 from .baofeng_uv25 import BaofengUV25Formatter
 from .baofeng_uv5rm import BaofengUV5RMFormatter
+from .anytone_878_uvii import Anytone878UVIIFormatter
 
 # Registry of all available radio formatters
 RADIO_FORMATTERS: Dict[str, Type[BaseRadioFormatter]] = {
@@ -31,6 +32,7 @@ RADIO_FORMATTERS: Dict[str, Type[BaseRadioFormatter]] = {
     "baofeng-uv28": BaofengUV28Formatter,
     "baofeng-uv25": BaofengUV25Formatter,
     "baofeng-uv5rm": BaofengUV5RMFormatter,
+    "anytone-878-uvii": Anytone878UVIIFormatter,
 }
 
 # Aliases for common radio names
@@ -45,6 +47,9 @@ RADIO_ALIASES: Dict[str, str] = {
     "anytone878v4": "anytone-878-v4",
     "anytone-878v4": "anytone-878-v4",
     "878v4": "anytone-878-v4",
+    "anytone-878-uvii-full": "anytone-878-uvii",
+    "anytone-878-uvii": "anytone-878-uvii",
+    "878uvii": "anytone-878-uvii",
     "anytone578": "anytone-578",
     "anytone_578": "anytone-578",
     "578": "anytone-578",
